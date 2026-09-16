@@ -1,0 +1,46 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+
+# === Virtual Environments ===
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# === VS Code ===
+.vscode/
+
+# === Testing (pytest, coverage) ===
+.pytest_cache/
+.coverage
+htmlcov/
+.cache
+
+# === Environment Variables & Secrets ===
+.env
+*.env
+env.ini
+
+# === Distribution & Packages ===
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
