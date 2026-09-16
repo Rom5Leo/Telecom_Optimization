@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "telecomopt"
+version = "0.1.0"
+description = "Telecom network optimization (AT&T challenges): RF modeling and classical-first solvers for antenna tilt, dispatch, and routing, with optional quantum solving via qcoptlib."
+authors = ["Rom5Leo"]
+readme = "README.md"
+packages = [{ include = "telecomopt", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26"
+scipy = "^1.12"
+matplotlib = "^3.8"
+# The quantum solver library — used OPTIONALLY, for the quantum component of a solution.
+# While co-developing both repos locally, prefer the path form:
+#   qcoptlib = { path = "../quantum-optimization", develop = true }
+# For a pinned dependency once published:
+qcoptlib = { git = "https://github.com/Rom5Leo/quantum-optimization.git", branch = "main" }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+jupyter = "^1.0"
+ruff = "^0.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
