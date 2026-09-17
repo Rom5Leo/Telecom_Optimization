@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "telecomopt", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.14"
 numpy = "^1.26"
 scipy = "^1.12"
 matplotlib = "^3.8"
@@ -15,7 +15,9 @@ matplotlib = "^3.8"
 # While co-developing both repos locally, prefer the path form:
 #   qcoptlib = { path = "../quantum-optimization", develop = true }
 # For a pinned dependency once published:
-qcoptlib = { git = "https://github.com/Rom5Leo/quantum-optimization.git", branch = "main" }
+## - replace when finish develop - qcoptlib = { git = "https://github.com/Rom5Leo/Quantum_Optimization.git", branch = "main" }
+qcoptlib = { path = "../Quantum_Optimization", develop = true }
+classiq = "^1.29.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
@@ -25,3 +27,9 @@ ruff = "^0.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:classiq.*"
+]
+
