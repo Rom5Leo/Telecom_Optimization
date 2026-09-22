@@ -44,3 +44,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# === For Self use ===
+
+CONTEXT.md
+docs/Ideas
