@@ -8,6 +8,16 @@ container, QAOA) lives in the reusable libraries, so this module stays small.
 Encoding: one binary per (antenna, tilt), ``v = i*K + k`` meaning antenna ``i`` uses tilt ``k``.
 A one-hot penalty enforces exactly one tilt per antenna. Coverage is a per-antenna reward
 (linear); interference is a pairwise coupling between neighbours (quadratic ZZ).
+
+Observation frame
+-----------------
+A network can be larger than the region you want to look at or optimize. An
+:class:`AntennaNetwork` therefore carries a **square observation frame** — a 2*half-width
+window in local coordinates centred at ``frame_center``. Antenna *positions never move*; the
+frame just selects which antennas are currently in view (:attr:`antennas_in_frame`). For the
+alternative approach we keep the frame **constant** (set once around the network), and
+:meth:`move_frame` / :meth:`subnetwork_in_frame` are the hooks for the moving-frame extension
+described in ``docs/Ideas/moving_frame_antenna_network.md``.
 """
 
 from __future__ import annotations
@@ -22,16 +32,19 @@ from qcoptlib.qubo import QUBO
 
 @dataclass
 class AntennaNetwork:
-    """A 2-D antenna network and its tilt option set.
+    """A 2-D antenna network, its tilt option set, and an observation frame.
 
     Attributes
     ----------
-    positions   : (n, 2) antenna coordinates (m).
+    positions   : (n, 2) antenna coordinates (m), in global coordinates.
     couple_range: two antennas interfere if within this distance (m).
     baseline_tilt : mechanical baseline downtilt (deg); electrical adds to it.
     elec_options  : the electrical tilt choices (deg), e.g. [-10, -5, 0, 5, 10].
     cell_edge   : distance at which each antenna serves its own users (m).
     params      : RF parameters (Ericsson defaults if omitted).
+    frame_center : centre of the square observation frame (m), in global coordinates.
+    frame_half_width : half the frame's side length (m); the frame spans
+        ``[cx - hw, cx + hw] x [cy - hw, cy + hw]``. Default 500 m -> a 1 km x 1 km zone.
     """
 
     positions: np.ndarray
@@ -40,9 +53,12 @@ class AntennaNetwork:
     elec_options: tuple[float, ...] = (-10.0, -5.0, 0.0, 5.0, 10.0)
     cell_edge: float = 200.0
     params: RFParams = None  # type: ignore
+    frame_center: tuple[float, float] = (0.0, 0.0)
+    frame_half_width: float = 500.0
 
     def __post_init__(self) -> None:
         self.positions = np.asarray(self.positions, dtype=float)
+        self.frame_center = np.asarray(self.frame_center, dtype=float)
         if self.params is None:
             self.params = RFParams()
 
@@ -64,6 +80,67 @@ class AntennaNetwork:
 
     def total_tilt(self, k: int) -> float:
         return self.baseline_tilt + self.elec_options[k]
+
+    # ---- observation frame ----
+    #
+    # Translation preserves antenna-to-antenna distances, so moving the frame changes which
+    # antennas are *in view*, never their physical positions or any RF calculation. Until a
+    # local subnetwork is built (:meth:`subnetwork_in_frame`), ``n``, ``neighbors`` and the
+    # QUBO still describe the ENTIRE network.
+
+    @property
+    def local_positions(self) -> np.ndarray:
+        """Antenna positions relative to the current frame centre."""
+        return self.positions - self.frame_center
+
+    @property
+    def in_frame_mask(self) -> np.ndarray:
+        """Boolean mask: which antennas fall inside the current square frame."""
+        return np.all(np.abs(self.local_positions) <= self.frame_half_width, axis=1)
+
+    @property
+    def antennas_in_frame(self) -> np.ndarray:
+        """Global indices of the antennas inside the current frame."""
+        return np.flatnonzero(self.in_frame_mask)
+
+    @property
+    def positions_in_frame(self) -> np.ndarray:
+        """Local (frame-relative) positions of the antennas inside the current frame."""
+        return self.local_positions[self.in_frame_mask]
+
+    def move_frame(self, x: float, y: float) -> None:
+        """Recentre the observation frame at global ``(x, y)`` (antennas do not move).
+
+        The constant-frame approach never calls this; it is the entry point for the
+        moving-frame extension (sweep a large network zone by zone).
+        """
+        self.frame_center = np.array([x, y], dtype=float)
+
+    def subnetwork_in_frame(self) -> tuple["AntennaNetwork", np.ndarray]:
+        """Build a standalone :class:`AntennaNetwork` from the antennas in the current frame.
+
+        Returns ``(local_net, ids)`` where ``ids`` are the original global indices (keep them
+        to map a decoded local solution back to the full network). The subnetwork inherits
+        every setting except positions, and is re-centred on the frame so its own frame again
+        covers it.
+
+        Modeling limitation: the subnetwork ignores interference from antennas *outside* the
+        frame. If boundary interference matters, account for it separately (e.g. as fixed
+        external interference, or by including nearby outside antennas in the RF calculation
+        without giving them optimization variables).
+        """
+        ids = self.antennas_in_frame
+        local = AntennaNetwork(
+            positions=self.positions[ids],
+            couple_range=self.couple_range,
+            baseline_tilt=self.baseline_tilt,
+            elec_options=self.elec_options,
+            cell_edge=self.cell_edge,
+            params=self.params,
+            frame_center=self.frame_center,
+            frame_half_width=self.frame_half_width,
+        )
+        return local, ids
 
     # ---- RF-derived quantities ----
 
