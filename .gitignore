@@ -49,3 +49,5 @@ MANIFEST
 
 CONTEXT.md
 docs/Ideas
+# cached QAOA solves (see cached_qaoa)
+qaoa_cache/
