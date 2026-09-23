@@ -200,3 +200,98 @@ def decode_onehot(bits, net: AntennaNetwork) -> list[int]:
     """Decode a bit vector to a tilt index per antenna (strongest bit per one-hot block)."""
     bits = np.asarray(bits, dtype=int)
     return [int(np.argmax(bits[i * net.k:(i + 1) * net.k])) for i in range(net.n)]
+
+
+# --------------------------------------------------------------------------- #
+# Compact (binary) tilt encoding.
+#
+# One-hot spends K qubits per antenna (one per tilt) and needs a penalty to keep exactly one
+# lit. A *binary* encoding instead spends only b = log2(K) qubits per antenna: the tilt index
+# is read off as an integer, t_i = sum_m 2^m x_{i,m}, so every bit pattern is a valid tilt and
+# NO one-hot penalty is needed. For K = 4 that is 2 qubits/antenna instead of 4 — half the
+# circuit width, and a cleaner QAOA landscape (no penalty terms).
+#
+# The catch, and the reason this is capped at K <= 4 here: a per-antenna cost f(t_i) expands as
+# a multilinear polynomial in the b bits, of degree up to b. For b <= 2 that is at most
+# quadratic — a genuine QUBO. For b >= 3 (K >= 8) it produces cubic-and-higher terms that a
+# QUBO cannot hold directly; you would need *quadratization* (auxiliary qubits) to reduce the
+# degree. That is the real cost of finer tilt resolution, and it is left as future work.
+# --------------------------------------------------------------------------- #
+
+def _multilinear_terms(values) -> dict[tuple[int, ...], float]:
+    """Multilinear expansion of a function of ``b`` bits given its ``2**b`` values.
+
+    ``values[t]`` is the function at the bit pattern whose integer is ``t`` (bit m has weight
+    ``2**m``). Returns ``{subset_of_bit_indices: coefficient}`` such that
+    ``f(x) = sum_S coeff_S * prod_{m in S} x_m`` exactly (Möbius transform over the subset
+    lattice). A subset of size d is a degree-d term.
+    """
+    from itertools import combinations
+
+    values = np.asarray(values, dtype=float)
+    size = len(values)
+    b = int(round(np.log2(size)))
+    if 2 ** b != size:
+        raise ValueError(f"values length {size} is not a power of two")
+
+    def t_of(subset):  # integer index where exactly `subset` bits are 1
+        return sum(1 << m for m in subset)
+
+    terms: dict[tuple[int, ...], float] = {}
+    for d in range(b + 1):
+        for S in combinations(range(b), d):
+            # c_S = sum_{U subset of S} (-1)^{|S|-|U|} f(t(U))
+            c = 0.0
+            for du in range(d + 1):
+                for U in combinations(S, du):
+                    c += ((-1) ** (d - du)) * values[t_of(U)]
+            if abs(c) > 1e-12:
+                terms[S] = c
+    return terms
+
+
+def antenna_tilt_qubo_compact(net: AntennaNetwork, beta: float = 0.02) -> QUBO:
+    """Assemble the antenna-tilt QUBO with a **binary** tilt encoding (b = log2(K) qubits/antenna).
+
+    Reproduces exactly the objective the one-hot :func:`antenna_tilt_qubo` has on its feasible
+    (one-per-antenna) states — per-antenna coverage reward plus the linear interference proxy —
+    but over ``net.n * log2(net.k)`` binary variables and with no one-hot penalty. Requires
+    ``net.k`` to be a power of two and (so the result stays a genuine QUBO) at most 4.
+
+    Variable layout: ``v = i*b + m`` is bit ``m`` of antenna ``i``; its tilt index is
+    ``t_i = sum_m 2**m x_{i,m}``.
+    """
+    n, k = net.n, net.k
+    b = int(round(np.log2(k)))
+    if 2 ** b != k:
+        raise ValueError(f"compact encoding needs k a power of two, got k={k}")
+    if b > 2:
+        raise NotImplementedError(
+            f"k={k} needs b={b} bits/antenna, whose cost expansion is degree {b} (cubic+). "
+            "A QUBO is degree 2 — reduce it with quadratization (auxiliary qubits). Left as future work."
+        )
+
+    # Per-antenna cost F_m(t): coverage reward + interference this antenna leaks as an interferer
+    # (matching the one-hot builder, where pair (i,j) contributes beta*interference(i,j,t_j)).
+    q = QUBO.zeros(n * b)
+    for m in range(n):
+        F = np.array([
+            -net.coverage(m, t) + sum(beta * net.interference(i, m, t)
+                                      for (i, j) in net.neighbors if j == m)
+            for t in range(k)
+        ])
+        for S, coeff in _multilinear_terms(F).items():
+            if len(S) == 0:
+                q.add_const(coeff)
+            elif len(S) == 1:
+                q.add_linear(m * b + S[0], coeff)
+            else:  # len == 2 (guaranteed by the b <= 2 check)
+                q.add_quadratic(m * b + S[0], m * b + S[1], coeff)
+    return q
+
+
+def decode_compact(bits, net: AntennaNetwork) -> list[int]:
+    """Decode a binary-encoded bit vector to a tilt index per antenna (``t_i = sum_m 2**m x_{i,m}``)."""
+    bits = np.asarray(bits, dtype=int)
+    b = int(round(np.log2(net.k)))
+    return [int(sum((1 << m) * bits[i * b + m] for m in range(b))) for i in range(net.n)]
