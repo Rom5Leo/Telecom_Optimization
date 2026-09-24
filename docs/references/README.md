@@ -27,6 +27,29 @@ chooses the coupled tilt configuration.
 Farhi–Goldstone–Gutmann (QAOA); Lucas, *Ising formulations of many NP problems*; Glover–Kochenberger–Du,
 *A tutorial on formulating and using QUBO models*. (Already reflected in `qcoptlib`.)
 
+## Further reading — the field beyond the three papers
+A running, annotated bibliography (CCO & traffic-weighting, SON/RET-via-learning, the quantum angle,
+tower-location datasets, and 3D/UAV coverage) lives in **`external_literature.md`**, each entry with
+a one-line "why-for-us". Add to it as stages need new sources.
+
+## How to find more articles (method, reusable for every problem)
+1. **Mine the papers you have.** Follow [E]/[BL]/[A]'s reference lists backward (foundational work)
+   and use Google Scholar's "Cited by" forward (who built on them) — this is the fastest way to the
+   canonical chain.
+2. **Search by the problem's real names,** not the hackathon phrasing: "antenna tilt optimization",
+   "coverage capacity optimization (CCO)", "remote electrical tilt (RET)", "self-organizing
+   networks (SON)", "cell shaping". Add a method ("reinforcement learning", "QUBO", "QAOA") or an
+   era ("5G", "6G", "2024..2026") to narrow.
+3. **Primary venues:** IEEE Xplore (VTC, GLOBECOM, ICC, TWC), arXiv (cs.NI, quant-ph), 3GPP TRs
+   (38.901 for the antenna/channel model). Vendor research (Ericsson, Nokia/Bell Labs) is gold for
+   realistic models and numbers.
+4. **Standards & data:** 3GPP technical reports for models/parameters; operator whitepapers for the
+   business figures (the ROI numbers in [A]).
+5. **Access:** you have IEEE via Tel Aviv University; for paywalled items check arXiv/ResearchGate
+   for the author's preprint, and Semantic Scholar / Connected Papers to map a topic's graph.
+6. **Log what you keep** here with a one-line reason (why it matters to *our* model) — like [E]'s
+   equation map — so the reference earns its place.
+
 ## The other two AT&T challenges (future repos, same rhythm)
 - **Field-technician dispatch** — VRP/TSP-with-time-windows; refs: QAOA, Lucas, Glover QUBO, D-Wave / Qiskit / PennyLane optimization docs.
 - **Network traffic routing** — multi-commodity flow; refs: RFC 2702 (MPLS TE), Fortz–Thorup (OSPF-weight TE), Kar–Kodialam–Lakshman (minimum-interference routing).
