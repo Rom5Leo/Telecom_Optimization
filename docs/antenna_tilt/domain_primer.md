@@ -2,9 +2,8 @@
 
 Read this alongside the three reference papers ([E] Ericsson 2010, [BL] Bell Labs 2011,
 [A] 5G/6G Academy 2026 — in `docs/references/`) and the 3GPP antenna model (TR 38.901). This
-primer gives the working physical intuition our pipeline is built on: what the antennas do, how a
-signal becomes coverage, and — the point Leo raised — the *full* problem space, not just
-interference.
+primer gives the working physical intuition the pipeline is built on: what the antennas do, how a
+signal becomes coverage, and the *full* problem space — not just interference.
 
 > Repo status: **in build.** This is the investigation phase (understand before modelling).
 

@@ -1,7 +1,7 @@
 # Decision Log — Antenna Tilt Optimization
 
 The audit trail for the antenna-tilt project: decisions (D##), open questions (OQ##), lessons
-(L##). Same discipline as FAHM_Project. Seeded during the investigation phase; grows as we build.
+(L##). Seeded during the investigation phase; grows as the project develops.
 
 > Status: **in build.** Investigation done (papers read, physics in `domain_primer.md`); build
 > starts one antenna at a time.
@@ -30,17 +30,26 @@ The audit trail for the antenna-tilt project: decisions (D##), open questions (O
 - Baseline = every antenna at its neutral/geometric tilt; ground truth = brute force on small
   instances (`Kⁿ`). Report the QAOA gap honestly (the alternative-approach showcase already does).
 
-## D03 — Build it from scratch: one → two → many
-- **Stage 1 — one antenna.** Coverage of a single sector vs distance and tilt; reproduce the
-  "there is an optimal tilt" curve from first principles; verify against [E]'s pattern. Deliverable:
-  the single-cell physics, understood and plotted.
-- **Stage 2 — two antennas.** The first coupling: how one antenna's tilt raises the other's
-  interference; the SINR trade-off surface over both tilts; the 2-D optimum by brute force. This is
-  where "not separable" becomes visible.
-- **Stage 3 — N antennas (multi-body).** The interference graph, the network SINR/throughput
-  surface, the QUBO encoding (one-hot + interference coupling), classical baseline vs QAOA. Extra
-  physics to verify as we scale (candidates in OQ2).
-- Rationale: each stage is a focused session that *earns* the next; the physics is clearest small.
+## D03 — Build it from scratch: field → users → coupling → users+coupling → many
+Refined so users enter right after the single-antenna field, so every later metric is meaningful.
+Two reusable concepts are named where they first appear: the **demand field** (1b) and
+**best-server assignment** (2a).
+- **Stage 1a — one antenna, the RF field.** Geometry (elevation angle), path loss, elevation gain,
+  path gain, SNR, spectral efficiency as functions of position. "What does one antenna produce in
+  space?" Verify each piece against [E].
+- **Stage 1b — one antenna + users.** Introduce a **demand field ρ(x,y)** (user/traffic density);
+  define the aggregate metrics carried everywhere after — coverage (served fraction / 5th-percentile
+  edge) and mean throughput (capacity), all ρ-weighted. Where "coverage" becomes a number about
+  people (OQ5).
+- **Stage 2a — two antennas, fields interact.** **Best-server assignment (MAX over antennas)** +
+  **interference (SUM of the rest)** → real SINR; the coupling and the overlap/handover region
+  appear (OQ4).
+- **Stage 2b — two antennas + users.** The demand-weighted joint objective; the mountain-vs-populated
+  overlap trade-off (OQ5) becomes concrete; the joint tilt trade-off.
+- **Stage 3 — N antennas + users.** Interference graph → QUBO (one-hot / compact) → classical
+  baseline vs QAOA. Extra physics to verify as we scale (OQ2).
+- Rationale: each stage is a focused step that earns the next; the physics is clearest small, and
+  introducing users early sets up OQ4/OQ5 exactly where they bite.
 
 ## D04 — Encoding (from qcoptlib)
 - One-hot per (antenna, tilt) with a one-hot penalty (`qcoptlib.qubo.onehot_penalty`), or the
@@ -51,8 +60,8 @@ The audit trail for the antenna-tilt project: decisions (D##), open questions (O
 
 # Open Questions
 
-## OQ1 — Leo's growing-frame idea ("integral derivation" / local-to-global assembly)
-- **Idea (captured so it isn't lost):** solve small sub-zones with a few antennas each, then let an
+## OQ1 — Growing-frame idea ("integral derivation" / local-to-global assembly)
+- **Idea:** solve small sub-zones with a few antennas each, then let an
   observation **frame grow**, adding more antennas and re-optimizing, assembling the global solution
   from local ones — like building an integral from local pieces.
 - **Why it's promising:** it directly attacks the `Kⁿ` blow-up (QAOA qubit budget) by keeping each
@@ -89,7 +98,7 @@ The audit trail for the antenna-tilt project: decisions (D##), open questions (O
   best-server coverage is a Stage-2/3 fidelity upgrade (it is non-quadratic, so it needs care:
   sampled users + max, or an auxiliary encoding). Stakes: closes the model-fidelity gap.
 
-## OQ5 — Traffic / user-density weighting (Leo's mountain-overlap idea)
+## OQ5 — Traffic / user-density weighting (the mountain-overlap case)
 - Weight the objective by a demand map ρ(x,y): overlap or a hole over an empty mountain costs ≈0;
   over a populated block it costs a lot. Standard practice ("traffic-driven tilt optimization",
   "density-based CCO" — see `docs/references/external_literature.md`).

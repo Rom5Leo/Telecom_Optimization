@@ -15,7 +15,7 @@ hackathon framing) are in this folder as PDFs; see `README.md` and `RF_model_ref
   https://arxiv.org/html/2507.19266v1 (Rel-19 overview referencing 38.901).
 
 ## Coverage-Capacity Optimization (CCO) & traffic/user-density weighting
-> Answers Leo's "permit overlap where nobody is" — weight the objective by demand ρ(x,y).
+> Overlap/holes where nobody is should cost little — weight the objective by demand ρ(x,y).
 - *On the potential of traffic-driven tilt optimization in LTE-A networks*, IEEE —
   https://ieeexplore.ieee.org/document/6666644/ — the direct precedent for demand-weighted tilt.
 - *Dynamic Coverage Optimization for 5G Ultra-dense Networks Based on User Densities*, Wireless Pers.
