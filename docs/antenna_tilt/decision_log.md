@@ -56,6 +56,18 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   compact binary encoding (`antenna_tilt_qubo_compact`, half the qubits) — both already built and
   tested. Decision of which to feature per instance is deferred to Stage 3.
 
+## D05 — Path loss uses horizontal distance (modeling convention); slant kept distinct
+- Choice: feed the **horizontal** distance `d` into `PL(d) = 134 + 35·log₁₀(d_km)`, and let the
+  elevation angle `β = arctan(Δh/d)` describe the geometry separately. Slant distance
+  `√(d² + Δh²)` is kept as a distinct quantity, not substituted into `PL`.
+- Reason: this is the **convention of the [E] macro model**, an empirical formula written in terms
+  of horizontal (2D) cell-plane distance. Adopting it is a modeling choice, stated as such — the
+  presence of a separate elevation term does not by itself establish which distance the propagation
+  model requires; we follow the source's convention.
+- Consequence: horizontal vs slant differ by `ΔPL = 35·log₁₀(√(d²+Δh²)/d)`, which for Δh = 28.5 m is
+  ≈ **2.14 dB at 50 m** and ≈ **0.025 dB at 500 m** — material only in the near field the model is
+  not meant to extrapolate into. Revisit if a near-tower regime ever matters.
+
 ---
 
 # Open Questions
