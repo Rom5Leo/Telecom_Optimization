@@ -194,19 +194,27 @@ def pattern_gain_db(
     tilt_m_deg: float = 0.0,
     params: RFParams = DEFAULT_PARAMS,
 ) -> float:
-    """Full 2-D relative antenna pattern (dB), [E] Equation 5, with electrical + mechanical tilt:
+    """RELATIVE 2-D antenna pattern A (dB) -- the bracket of [E] Equation 5, WITHOUT the peak
+    gain G0 and before path loss:
 
-        G(alpha, phi) = max{ G_az(phi') + G_el(alpha') , SLL0 }
+        A(alpha, phi) = max{ G_az(phi_A) + G_el(alpha_A) , SLL0 }
 
-    Electrical tilt shifts the elevation term only (identical in every azimuth). Mechanical
-    tilt physically rotates the panel, so the panel-frame angles (alpha', phi') seen from a
-    fixed ground direction change with azimuth -- which is why the two mechanisms differ
-    off-boresight ([E] Fig. 2). On boresight (phi = 0) they collapse to the total tilt.
+    A peaks at 0 dB (boresight, on-beam); the ABSOLUTE antenna gain is G0 + A (peaks at G0 =
+    18 dBi), and the path gain is G0 + A - PL (see path_gain_2d_db). Keeping A separate from G0
+    is what avoids double-counting the peak gain.
+
+    Frames: the point is given in the EARTH frame (alpha_E, phi_E). Mechanical tilt maps it to
+    the ANTENNA frame (alpha_A, phi_A) by a rotation about the horizontal y-axis by -tilt_m
+    ([E] Section II-B coordinate transform; Fig. 2 shows its consequences). Both pattern terms
+    are then evaluated in the antenna frame; ELECTRICAL tilt enters only the elevation term
+    (identical in every azimuth). On boresight (phi_E = 0) the two tilts collapse to the total
+    tilt; off-boresight they differ. (In the code below the antenna-frame angles alpha_A, phi_A
+    are the variables ``alpha_p``/``phi_p``.)
 
     Parameters
     ----------
-    depression_deg : downward angle to the point (positive below horizon = elevation_angle_deg).
-    azimuth_deg    : horizontal angle from the sector boresight.
+    depression_deg : downward angle to the point in the EARTH frame (= elevation_angle_deg).
+    azimuth_deg    : Earth-frame azimuth from the sector boresight.
     tilt_e_deg     : electrical downtilt.
     tilt_m_deg     : mechanical downtilt.
     """
@@ -243,6 +251,7 @@ def path_gain_2d_db(
     tilt_m_deg: float = 0.0,
     params: RFParams = DEFAULT_PARAMS,
 ) -> float:
-    """2-D path gain (dB): G0 + 2-D pattern - path loss. Generalizes path_gain_db to azimuth."""
+    """2-D path gain (dB): g_dB = G0 + A - PL, where A is the relative pattern (pattern_gain_db)
+    and G0 is the peak gain. Generalizes path_gain_db to azimuth (and mechanical tilt)."""
     beta = elevation_angle_deg(distance_m, params)
     return params.g0_dbi + pattern_gain_db(beta, azimuth_deg, tilt_e_deg, tilt_m_deg) - path_loss_db(distance_m)

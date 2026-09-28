@@ -113,7 +113,9 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   curves).
 - Not interchangeable in general: mechanical tilt rotates the whole 3-D pattern (azimuth coupled),
   electrical shifts only the elevation term in antenna coordinates; off-boresight they diverge ([E]
-  Eq. 5 + Fig. 2 coordinate transform). [E]: split ≤0.5 dB on coverage, matters for capacity (OQ3).
+  Eq. 5 + Fig. 2 coordinate transform). [E]: in its simulated scenario the split has a small coverage
+  effect (≤0.5 dB on [E]'s 5th-percentile path-gain coverage) and matters for capacity — not a general
+  bound (OQ3).
 - Decision: `t` denotes electrical tilt with `α_m = 0` through §1–§4; §5 states the forward-slice
   equivalence and §6 adds the 2-D pattern so the distinction is visible. The notebook must not present
   the two mechanisms as interchangeable in general.
@@ -129,8 +131,30 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   divergent off-boresight (verified ≈0.98 dB at az=40°, up to ~12 dB near the azimuth edge).
 - Verification (tests, all green): azimuth defining points; forward slice reduces exactly to the 1-D
   `path_gain_db`; boresight total-tilt equivalence; off-boresight electrical≠mechanical; SLL0 floor.
-- Consequence: 1a now ends with a 2-D **spatial radio model** (`path_gain_2d_db` over an (x,y) grid),
-  the substrate 1b builds demand/thresholds/aggregation on (D03 refinement).
+- Gain convention (no double-counting): `pattern_gain_db` returns the **relative** pattern
+  `A = max{G_az + G_el, SLL0}` (peaks at 0 dB, excludes G0); absolute gain is `G0 + A` (peaks at 18
+  dBi); path gain is `g_dB = G0 + A − PL` (`path_gain_2d_db`). Off-axis pattern plots show A, not gain.
+- Frames: point given in the Earth frame (α_E, φ_E); mechanical tilt maps it to the antenna frame
+  (α_A, φ_A) by a rotation about the horizontal y-axis by −α_m ([E] §II-B; Fig. 2 shows consequences);
+  electrical tilt then enters the elevation term. (Note: [E] uses primes for Earth-fixed coords, so we
+  use explicit E/A subscripts rather than primes.)
+- Scope of verification: the deterministic model **follows [E]'s equations** and is checked against
+  analytical limiting cases and internal-consistency conditions (forward-slice reduction, boresight
+  equivalence, defining points) — not a reproduction of [E]'s network-level results, and shadowing is
+  still deferred (D06).
+- Consequence: 1a now ends with a 2-D **spatial radio model** (`path_gain_2d_db` over an (x,y) grid,
+  masked inside the near-tower floor of D09), the substrate 1b builds demand/thresholds/aggregation on
+  (D03 refinement).
+
+## D09 — Near-tower validity floor (exclusion region)
+- The empirical path-loss law is not valid arbitrarily close to the mast: `log10(0)` at `d=0`, azimuth
+  undefined there, and the macro regression was never fit at very short range. The current `d≥1 m`
+  clamp in `path_loss_db` is only a numerical guard, so any central 'hot spot' in the 2-D map is an
+  artefact of that clamp, not physics.
+- Decision: define an explicit **minimum valid horizontal distance `d_min = 35 m`** (aligns with the
+  3GPP macro minimum BS–UE 2-D distance) and treat `d < d_min` as an **exclusion region**: masked in
+  the map, and — importantly — excluded from the 1b domain/aggregation so the optimizer cannot be
+  rewarded for an invalid part of the model. Revisit the exact value if a small-cell regime is added.
 
 ---
 
@@ -172,7 +196,8 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - Stakes: model fidelity (the 86% ceiling in the showcase came from the separable proxy).
 
 ## OQ3 — Electrical / mechanical split
-- [E]: the split barely affects coverage (≤0.5 dB) but matters for capacity (pure electrical best
+- [E]: in its simulated scenario the split barely affects coverage (≤0.5 dB on [E]'s 5th-percentile
+  path-gain coverage) but matters for capacity (pure electrical best
   for edge/mean; even split for peak). Decide whether to model only total tilt (simpler) or expose
   the split as a second variable. Default: total tilt first; revisit if capacity metrics need it.
 
@@ -202,6 +227,15 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - The model is 2D (ground plane, UE at 1.5 m), matching the papers and tractable. But tilt is a
   vertical control, so 3D changes the answer (upper floors, UAV corridors). Start 2D; log 3D as a
   "further work" extension (user height distribution / UAV placement — see `external_literature.md`).
+
+## OQ9 — What ρ measures, and which 1b metrics (decide before aggregating)
+- The weight field ρ(x,y) is not one thing: **user density** → user-weighted metrics; **traffic
+  density** → traffic-weighted metrics; **uniform** → area-based metrics. These are different
+  objectives (whose experience we improve), to be chosen explicitly in 1b, not defaulted.
+- Keep the metrics distinct rather than merged: **served fraction** (above a threshold) and
+  **5th-percentile** performance are separate numbers; **mean Shannon spectral efficiency** keeps that
+  name (an idealized proxy) until bandwidth and resource sharing are introduced. Service thresholds are
+  a modeling choice to state. Uncertainty analysis (D06) remains explicitly pending.
 
 ---
 

@@ -60,7 +60,8 @@ buildings/terrain — which is why coverage is a *distribution*, not a single nu
 - **Combined** — total tilt `α_tilt = α_e + α_m`; the ratio `r = α_e/α_tilt` is a design choice.
 
 **What [E] found (the paper's core result):** total tilt strongly affects *both* coverage and
-capacity; the electrical/mechanical *split* matters only for capacity (≤0.5 dB effect on coverage).
+capacity; the electrical/mechanical *split* matters mainly for capacity (≤0.5 dB on [E]'s 5th-percentile
+coverage, in [E]'s simulated scenario — not a general bound).
 Pure electrical is best for cell-edge and mean throughput; peak throughput likes an even split.
 Cell-edge performance is the most tilt-sensitive metric, and the optimal cell-edge tilt is about
 *half* the peak-rate tilt. Practical baseline (from [A]): geometric tilt `θ_geo = arctan(h/d)`, so
