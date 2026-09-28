@@ -41,7 +41,7 @@ a one-line "why-for-us". Add to it as stages need new sources.
    networks (SON)", "cell shaping". Add a method ("reinforcement learning", "QUBO", "QAOA") or an
    era ("5G", "6G", "2024..2026") to narrow.
 3. **Primary venues:** IEEE Xplore (VTC, GLOBECOM, ICC, TWC), arXiv (cs.NI, quant-ph), 3GPP TRs
-   (38.901 for the antenna/channel model). Vendor research (Ericsson, Nokia/Bell Labs) is gold for
+   (36.814 / 25.996 for the antenna model, which [E] cites; 38.901 is the later 5G successor with the same form). Vendor research (Ericsson, Nokia/Bell Labs) is gold for
    realistic models and numbers.
 4. **Standards & data:** 3GPP technical reports for models/parameters; operator whitepapers for the
    business figures (the ROI numbers in [A]).

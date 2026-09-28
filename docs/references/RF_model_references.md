@@ -53,7 +53,8 @@ The exact equation from the paper:
 - HPBW_el = 6.5°, SLL_el = −17 dB (Table I)
 - The −12 constant is the 3GPP value making gain drop 3 dB at the half-power beamwidth edge.
 
-[A] confirms this is the 3GPP TR 38.901 model: "A_V(θ) = −min(12·((θ − θ_tilt)/θ_3dB)², SLA_V)",
+This is the standard 3GPP parabolic pattern — [E] cites TR 36.814 / TR 25.996 for it. [A] states the
+same form, "A_V(θ) = −min(12·((θ − θ_tilt)/θ_3dB)², SLA_V)", and relates it to the later TR 38.901,
 "used in all major planning tools (Atoll, ASSET, Planet)."
 
 The full 2-D gain (we use only the elevation cut) is [E] Equation 5:

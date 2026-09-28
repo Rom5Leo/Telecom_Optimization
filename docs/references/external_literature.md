@@ -11,8 +11,9 @@ hackathon framing) are in this folder as PDFs; see `README.md` and `RF_model_ref
   IEEE 2011 — **owned**. The optimization objective (cell-edge weighting), clustering, baseline.
 - **[A] Walia**, *Antenna Tilt Optimization: Mechanical vs Electrical*, 5G/6G Academy 2026 —
   **owned**. Practitioner framing + operator ROI.
-- **3GPP TR 38.901** (channel model) — the standardized antenna radiation pattern behind our `G_el`.
-  https://arxiv.org/html/2507.19266v1 (Rel-19 overview referencing 38.901).
+- **3GPP TR 36.814 / TR 25.996** — the standardized antenna radiation pattern behind our `G_el`, as
+  cited in [E]. The later 5G channel model **TR 38.901** carries the same parabolic form (Rel-19
+  overview: https://arxiv.org/html/2507.19266v1).
 
 ## Coverage-Capacity Optimization (CCO) & traffic/user-density weighting
 > Overlap/holes where nobody is should cost little — weight the objective by demand ρ(x,y).

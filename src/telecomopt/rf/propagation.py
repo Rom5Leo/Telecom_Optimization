@@ -102,7 +102,7 @@ def elevation_gain_db(
 ) -> float:
     """Antenna elevation-pattern gain (dB) toward a user, given the beam's downtilt.
 
-    Provenance: [E] Equation 4 (the 3GPP TR 38.901 vertical pattern, per [A]):
+    Provenance: [E] Equation 4 (the standard 3GPP parabolic vertical pattern; [E] cites TR 36.814 / TR 25.996):
 
         G_el(alpha) = max( -12 * ((alpha - tilt) / HPBW_el)^2 ,  SLL_el )
 

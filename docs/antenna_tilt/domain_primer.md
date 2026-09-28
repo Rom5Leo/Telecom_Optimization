@@ -1,7 +1,7 @@
 # Domain Primer — Antenna Tilt Optimization (how AT&T's cellular network actually works)
 
 Read this alongside the three reference papers ([E] Ericsson 2010, [BL] Bell Labs 2011,
-[A] 5G/6G Academy 2026 — in `docs/references/`) and the 3GPP antenna model (TR 38.901). This
+[A] 5G/6G Academy 2026 — in `docs/references/`) and the 3GPP antenna model (TR 36.814). This
 primer gives the working physical intuition the pipeline is built on: what the antennas do, how a
 signal becomes coverage, and the *full* problem space — not just interference.
 
@@ -39,7 +39,7 @@ three pieces (all in dB), exactly as `telecomopt.rf` implements them from [E]:
    — an obstructed macro environment (signals fade faster than the free-space exponent of 2).
 2. **Antenna elevation gain** — the beam's shape. The user sits at an elevation angle
    `α = arctan((h_bs − h_ue)/d)` below the antenna. The gain toward that angle is a Gaussian main
-   beam with a sidelobe floor ([E] Eq. 4, the 3GPP TR 38.901 pattern):
+   beam with a sidelobe floor ([E] Eq. 4, the standard 3GPP parabolic pattern [E] cites from TR 36.814 / TR 25.996):
    `G_el(α) = max( −12·((α + α_e)/HPBW_el)² , SLL_el )`, with **HPBW_el = 6.5°**,
    **SLL_el = −17 dB**, and `α_e` the electrical downtilt. Gain peaks when the beam points *at* the
    user (`α = −α_e`) and falls off as a downward parabola. **Tilt enters the entire model only
@@ -132,5 +132,5 @@ large-scale wireless coverage optimization* (see references).
 2. `docs/references/RF_model_references.md` — every code equation mapped to its source.
 3. **[BL] Bell Labs 2011** — the optimization objective (cell-edge weighting), clustering, baseline.
 4. **[A] 5G/6G Academy 2026** — practitioner framing, mechanical-vs-electrical, ROI.
-5. 3GPP TR 38.901 — the standardized antenna pattern (our `G_el`).
+5. 3GPP TR 36.814 §A.2.1.1 — the standardized antenna pattern [E] cites for our `G_el` (also TR 25.996).
 6. The CCO / RET-RL / quantum-coverage papers in `docs/references/README.md` — where the field is now.

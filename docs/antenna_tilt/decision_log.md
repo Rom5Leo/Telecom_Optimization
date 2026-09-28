@@ -69,17 +69,30 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   not meant to extrapolate into. Revisit if a near-tower regime ever matters.
 
 ## D06 — Uncertainty & statistical rigor (report distributions, not point values)
-- Choice: treat every headline number as an estimate with a stated uncertainty, and distinguish three
-  sources rather than collapsing them:
-  - **Statistical** — the model is stochastic (lognormal shadow fading, σ = 8 dB), so coverage and
-    capacity are *distributions*. Monte-Carlo over fading realizations → report KPIs with confidence
-    intervals; the MC error shrinks ~ 1/√N. This is why [E] already reports 5th/95th percentiles.
-  - **Algorithmic** — QAOA is stochastic (parameter init, measurement sampling, optimizer path).
-    Every quantum-vs-classical comparison is reported as **mean ± std over seeds** with a
-    significance check, not a single run. This is the concrete form of the project's honest-benchmark
-    stance ("86% ± 4% over 20 seeds vs classical 92% ± 1%" beats "86%").
-  - **Systematic** — model/parameter choices (path-loss exponent, σ, the pattern approximation, the
-    horizontal-distance convention of D05). Probe by sensitivity sweeps, not error bars.
+- Choice: treat every headline number as an estimate with a stated uncertainty, and keep **four
+  distinct sources** separate (Monte-Carlo is a *sampling method*, not itself a Bayesian analysis):
+  1. **Environmental variability** — the physical randomness the model represents (lognormal shadow
+     fading, σ = 8 dB). Coverage/capacity are *distributions*; report their **percentiles** (the
+     spread of outcomes over the population/realizations). This is why [E] uses the 5th/95th percentile.
+  2. **Finite Monte-Carlo error** — numerical uncertainty in an *estimate* from only N realizations.
+     For the mean, `SE[μ̂] ≈ s/√N`. A percentile interval of outcomes and a confidence interval for the
+     mean answer **different questions**; do not conflate them. Caveat: one realization can be a whole
+     spatially-correlated shadowing field — correlated points within it are *not* independent repeats,
+     so N is the number of independent fields, not user points. σ = 8 dB is an input, not the error bar
+     on the final KPI; it must be propagated through the model.
+  3. **Parameter / model uncertainty** — limited knowledge of the modeled system (path-loss slope, the
+     approximate pattern, the horizontal-vs-slant choice of D05). Treat these *first* as explicit
+     alternative assumptions and sensitivity sweeps; assigning them Bayesian priors is possible but
+     needs justification (with measurements D: `p(θ|D) ∝ p(D|θ)p(θ)`; without D it is only a *prior*
+     predictive analysis).
+  4. **Solver randomness** — optimizer seeds now, quantum measurement shots later. Report
+     quantum-vs-classical as a distribution over seeds — but only after **defining "better"**
+     (mean objective? reliability? time-to-target? under what compute budget?); seeds alone don't
+     settle it, and a Bayesian comparison is one option, not automatically preferable.
+- Variance-reduction to adopt from the start: **paired comparison under common conditions** — for each
+  environmental realization i, evaluate both tilts and take `ΔK_i = K_i(t_A) − K_i(t_B)`. Holding the
+  shadowing field fixed across the two settings separates the effect of tilt from the luck of the draw
+  and sharpens the comparison.
 - Explicitly *not* done: formal error propagation on the fixed [E] constants — results are reported
   **relative to a baseline** (D01), so absolute-value uncertainty is moot, and this is a simulation,
   not a measurement, so there is no instrumental error to propagate.
