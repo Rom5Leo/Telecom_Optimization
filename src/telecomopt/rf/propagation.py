@@ -40,6 +40,9 @@ class RFParams:
     n0_dbm    : noise power per PRB (dBm).                   [E] Table I: -111 dBm
     pl_intercept : path-loss intercept (dB).                [E] Table I: 134
     pl_slope     : path-loss slope (dB per decade of km).   [E] Table I: 35
+    hpbw_az   : azimuth half-power beamwidth (deg).          [E] Table I: 65 deg
+    sll_az    : azimuth sidelobe level (dB, negative).       [E] Table I: -25 dB
+    sll0      : overall pattern sidelobe floor (dB, neg).    [E] Table I: -30 dB
     """
 
     bs_height: float = 30.0
@@ -51,6 +54,9 @@ class RFParams:
     n0_dbm: float = -111.0
     pl_intercept: float = 134.0
     pl_slope: float = 35.0
+    hpbw_az: float = 65.0
+    sll_az: float = -25.0
+    sll0: float = -30.0
 
 
 DEFAULT_PARAMS = RFParams()
@@ -164,3 +170,79 @@ def spectral_efficiency(sinr_linear: float) -> float:
     rather than LTE coding tables.
     """
     return float(np.log2(1.0 + sinr_linear))
+
+
+def azimuth_gain_db(azimuth_deg: float, params: RFParams = DEFAULT_PARAMS) -> float:
+    """Azimuth-pattern gain (dB) toward a user, [E] Equation 3:
+
+        G_az(phi) = max( -12 * (phi / HPBW_az)^2 , SLL_az )
+
+    Same parabola-with-floor as the elevation pattern, but horizontal: peak at boresight
+    (phi = 0), -3 dB at +/- HPBW_az/2, floored at the azimuth sidelobe level.
+    HPBW_az = 65 deg, SLL_az = -25 dB ([E] Table I).
+    """
+    # mirror elevation_gain_db, but in azimuth (no tilt term).
+    mismatch = azimuth_deg / params.hpbw_az 
+    return max(-12 * mismatch**2, params.sll_az)
+    
+
+
+def pattern_gain_db(
+    depression_deg: float,
+    azimuth_deg: float,
+    tilt_e_deg: float = 0.0,
+    tilt_m_deg: float = 0.0,
+    params: RFParams = DEFAULT_PARAMS,
+) -> float:
+    """Full 2-D relative antenna pattern (dB), [E] Equation 5, with electrical + mechanical tilt:
+
+        G(alpha, phi) = max{ G_az(phi') + G_el(alpha') , SLL0 }
+
+    Electrical tilt shifts the elevation term only (identical in every azimuth). Mechanical
+    tilt physically rotates the panel, so the panel-frame angles (alpha', phi') seen from a
+    fixed ground direction change with azimuth -- which is why the two mechanisms differ
+    off-boresight ([E] Fig. 2). On boresight (phi = 0) they collapse to the total tilt.
+
+    Parameters
+    ----------
+    depression_deg : downward angle to the point (positive below horizon = elevation_angle_deg).
+    azimuth_deg    : horizontal angle from the sector boresight.
+    tilt_e_deg     : electrical downtilt.
+    tilt_m_deg     : mechanical downtilt.
+    """
+    # ground-frame unit vector to the point (elevation positive UP, so a ground user is below: -depression)
+    eps = np.radians(-depression_deg)
+    phi = np.radians(azimuth_deg)
+    ux = np.cos(eps) * np.cos(phi)
+    uy = np.cos(eps) * np.sin(phi)
+    uz = np.sin(eps)
+
+    # mechanical downtilt = rotate this fixed ground direction into the panel
+    # frame about the horizontal y-axis by -tilt_m. With z = radians(tilt_m_deg):
+    # ux_p = ;  uz_p = 
+    z = np.radians(tilt_m_deg)
+    ux_p = np.cos(z)*ux - np.sin(z)*uz    # rotated x-component
+    uz_p = np.sin(z)*ux + np.cos(z)*uz   # rotated z-component
+    uy_p = uy    # y-axis is the rotation axis, unchanged
+
+    # panel-frame elevation and azimuth of the point
+    alpha_p = np.degrees(np.arcsin(np.clip(uz_p, -1.0, 1.0)))
+    phi_p = np.degrees(np.arctan2(uy_p, ux_p))
+
+    # elevation term (Eq 4) peaks at alpha_p = -tilt_e (electrical shifts elevation only)
+    #  azimuth term (Eq 3) is azimuth_gain_db(phi_p). Combine per Eq 5, floored at SLL0.
+    g_el = max(-12 * ((alpha_p + tilt_e_deg) / params.hpbw_el) ** 2, params.sll_el)
+    g_az = azimuth_gain_db(phi_p, params)
+    return max(g_az + g_el, params.sll0)
+
+
+def path_gain_2d_db(
+    distance_m: float,
+    azimuth_deg: float,
+    tilt_e_deg: float = 0.0,
+    tilt_m_deg: float = 0.0,
+    params: RFParams = DEFAULT_PARAMS,
+) -> float:
+    """2-D path gain (dB): G0 + 2-D pattern - path loss. Generalizes path_gain_db to azimuth."""
+    beta = elevation_angle_deg(distance_m, params)
+    return params.g0_dbi + pattern_gain_db(beta, azimuth_deg, tilt_e_deg, tilt_m_deg) - path_loss_db(distance_m)

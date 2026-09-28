@@ -50,6 +50,11 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   baseline vs QAOA. Extra physics to verify as we scale (OQ2).
 - Rationale: each stage is a focused step that earns the next; the physics is clearest small, and
   introducing users early sets up OQ4/OQ5 exactly where they bite.
+- Refinement (from the 1a build): Stage 1a closes the **antenna model** fully before demand — beyond
+  the boresight chain it also covers electrical-vs-mechanical tilt (D07) and the full 2-D pattern
+  ([E] Eq. 5, azimuth), ending with a **2-D spatial radio model** over a ground plane. Stage 1b then
+  adds the demand field ρ(x,y), service thresholds, and aggregation *on that 2-D model* — the 2-D map
+  is chosen over a 1-D observation line because the demand field is itself 2-D.
 
 ## D04 — Encoding (from qcoptlib)
 - One-hot per (antenna, tilt) with a one-hot penalty (`qcoptlib.qubo.onehot_penalty`), or the
@@ -101,9 +106,45 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   is the optimal tilt fragile to a perturbed demand map or a different fading draw? (ties to OQ5, and
   to why operators re-tune tilt on live traffic).
 
+## D07 — Tilt: electrical vs mechanical, and where the single-tilt model is valid
+- Forward (boresight) slice: mechanical downtilt `α_m` makes the elevation `α = α_m − β`, so [E] Eq. 4's
+  mismatch `α + α_e = α_m + α_e − β` depends only on **total** tilt `t = α_e + α_m`. Electrical and
+  mechanical are therefore interchangeable **there** (§5 confirms it: equal-sum splits give identical
+  curves).
+- Not interchangeable in general: mechanical tilt rotates the whole 3-D pattern (azimuth coupled),
+  electrical shifts only the elevation term in antenna coordinates; off-boresight they diverge ([E]
+  Eq. 5 + Fig. 2 coordinate transform). [E]: split ≤0.5 dB on coverage, matters for capacity (OQ3).
+- Decision: `t` denotes electrical tilt with `α_m = 0` through §1–§4; §5 states the forward-slice
+  equivalence and §6 adds the 2-D pattern so the distinction is visible. The notebook must not present
+  the two mechanisms as interchangeable in general.
+
+## D08 — Full 2-D pattern (Eq. 3 + Eq. 5) closes 1a with a spatial radio model
+- Added to `telecomopt.rf`: `azimuth_gain_db` (Eq. 3, `max(-12(φ/HPBW_az)², SLL_az)`),
+  `pattern_gain_db` (Eq. 5, `max{G_az(φ') + G_el(α'), SLL0}`), and `path_gain_2d_db`
+  (`G0 + pattern − PL`). New `RFParams` fields from [E] Table I: `hpbw_az=65`, `sll_az=−25`,
+  `sll0=−30`. Tests in `tests/test_propagation_2d.py`.
+- Mechanical tilt = a coordinate rotation: the fixed ground direction (unit vector) is rotated into the
+  panel frame about the horizontal y-axis by `−α_m`; electrical tilt shifts only the elevation term.
+  This reproduces [E]'s stated behaviour: identical to electrical on boresight (both → total tilt),
+  divergent off-boresight (verified ≈0.98 dB at az=40°, up to ~12 dB near the azimuth edge).
+- Verification (tests, all green): azimuth defining points; forward slice reduces exactly to the 1-D
+  `path_gain_db`; boresight total-tilt equivalence; off-boresight electrical≠mechanical; SLL0 floor.
+- Consequence: 1a now ends with a 2-D **spatial radio model** (`path_gain_2d_db` over an (x,y) grid),
+  the substrate 1b builds demand/thresholds/aggregation on (D03 refinement).
+
 ---
 
 # Open Questions
+
+## OQ8 — Constants as a config layer (FAHM-style)
+- Now: all [E] Table I constants live in `RFParams` — a frozen, typed dataclass with inline provenance,
+  passed explicitly to pure functions. That is already a single source of truth, and arguably safer for
+  fixed physics constants than a loose config file (typed, refactor-safe, no hidden globals).
+- Question: add a declarative config layer (e.g. `configs/*.toml` + `RFParams.from_toml`) as in FAHM?
+  Its value appears when **scenarios multiply** — named parameter sets (dense-urban vs rural),
+  reproducible experiment configs, tuning without code edits — which is Stage 3, not now (YAGNI today).
+- Leaning: keep `RFParams` as the typed interface; add the TOML scenario layer when the first alternate
+  scenario is needed (or now, if we want the FAHM pattern established early for portfolio consistency).
 
 ## OQ1 — Growing-frame idea ("integral derivation" / local-to-global assembly)
 - **Idea:** solve small sub-zones with a few antennas each, then let an
@@ -165,5 +206,15 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 ---
 
 # Lessons
-*(to be filled as we build — carry over the FAHM habits: measure first, run the trivial baseline,
-verify against the source, base-rate every claim, check a recipe's assumptions against the data.)*
+*(carry over the FAHM habits: measure first, run the trivial baseline, verify against the source,
+base-rate every claim, check a recipe's assumptions against the data.)*
+
+## L01 — The path-gain maximum is not the beam-pointing distance
+- The beam points at `d_beam = Δh/tan t`, but path gain `g = G0 + G_el − PL` peaks *nearer* the tower
+  (≈153 m vs `d_beam`≈203 m at t=8°): at `d_beam` the elevation gain has zero slope while path loss is
+  still rising, so `dg/dd|_{d_beam} = −35/(d_beam·ln10) < 0`. Named `d_beam`, not `d*` — a star implies
+  an optimum it is not.
+- Reading corollaries: the sharp corners in the path-gain / pattern curves are the model floor's `max()`
+  slope discontinuity (≈101 m at t=8°), not a physical beam edge; and the near-tower rise is the
+  empirical path-loss law extrapolated toward `d→0` where it is unphysical — the global argmax there is
+  an artefact, not a prediction.
