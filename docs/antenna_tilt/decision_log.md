@@ -68,6 +68,26 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   ≈ **2.14 dB at 50 m** and ≈ **0.025 dB at 500 m** — material only in the near field the model is
   not meant to extrapolate into. Revisit if a near-tower regime ever matters.
 
+## D06 — Uncertainty & statistical rigor (report distributions, not point values)
+- Choice: treat every headline number as an estimate with a stated uncertainty, and distinguish three
+  sources rather than collapsing them:
+  - **Statistical** — the model is stochastic (lognormal shadow fading, σ = 8 dB), so coverage and
+    capacity are *distributions*. Monte-Carlo over fading realizations → report KPIs with confidence
+    intervals; the MC error shrinks ~ 1/√N. This is why [E] already reports 5th/95th percentiles.
+  - **Algorithmic** — QAOA is stochastic (parameter init, measurement sampling, optimizer path).
+    Every quantum-vs-classical comparison is reported as **mean ± std over seeds** with a
+    significance check, not a single run. This is the concrete form of the project's honest-benchmark
+    stance ("86% ± 4% over 20 seeds vs classical 92% ± 1%" beats "86%").
+  - **Systematic** — model/parameter choices (path-loss exponent, σ, the pattern approximation, the
+    horizontal-distance convention of D05). Probe by sensitivity sweeps, not error bars.
+- Explicitly *not* done: formal error propagation on the fixed [E] constants — results are reported
+  **relative to a baseline** (D01), so absolute-value uncertainty is moot, and this is a simulation,
+  not a measurement, so there is no instrumental error to propagate.
+- Reason: it is both physically honest (the fading term makes KPIs random by construction) and a
+  portfolio differentiator (most such projects report bare single numbers). Also feeds robustness:
+  is the optimal tilt fragile to a perturbed demand map or a different fading draw? (ties to OQ5, and
+  to why operators re-tune tilt on live traffic).
+
 ---
 
 # Open Questions
