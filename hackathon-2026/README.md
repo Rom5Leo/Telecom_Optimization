@@ -15,7 +15,6 @@ qubit saving.
 |---|---|
 | `team-solution/` | The submitted approach — overlap-area QUBO + encoding comparison. Credit: Michael Morami ([repo](https://github.com/MichaelMorami/Classiq-Hackathon-2026)) |
 | `alternative-approach/` | A direct-SINR objective formulation (this author's) |
-| `comparison.md` | Overlap-surrogate vs direct-SINR; one-hot vs binary encoding — the trade-offs |
 | `pitch/` | Slide deck and speaker notes |
 
 ## The two approaches in one line

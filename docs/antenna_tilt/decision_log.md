@@ -170,23 +170,28 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - Leaning: keep `RFParams` as the typed interface; add the TOML scenario layer when the first alternate
   scenario is needed (or now, if we want the FAHM pattern established early for portfolio consistency).
 
-## OQ1 — Growing-frame idea ("integral derivation" / local-to-global assembly)
-- **Idea:** solve small sub-zones with a few antennas each, then let an
-  observation **frame grow**, adding more antennas and re-optimizing, assembling the global solution
-  from local ones — like building an integral from local pieces.
-- **Why it's promising:** it directly attacks the `Kⁿ` blow-up (QAOA qubit budget) by keeping each
-  solve small; it matches the constant/moving **frame** already in `telecomopt.antenna`
-  (`frame_center`, `subnetwork_in_frame`, `move_frame`) and the idea doc in `docs/Ideas/`.
-- **The hard part to test:** interference is coupled *across* frame boundaries, so a locally optimal
-  zone can be globally suboptimal (the boundary-interference limitation already flagged in the frame
-  code). Questions: how much overlap between adjacent frames is needed? Fixed external interference
-  vs including boundary antennas as fixed (non-optimized) neighbours? Does re-optimizing on frame
-  growth converge, and to how close to the global optimum (measure vs brute force on medium N)?
-- **Related methods to check:** domain decomposition, large-neighbourhood / rolling-horizon search,
-  and clustering approaches in [BL]/[A] ("optimize in clusters of 7–19 sites"). Our growing frame is
-  a principled, quantum-budget-aware version of that clustering.
-- **Stakes:** if it holds, it's the scalability story that makes QAOA credible beyond toy sizes —
-  the project's potential novelty. Test empirically once Stage 3 exists.
+## OQ1 — Moving-frame idea (constant sliding frame / local-to-global assembly) — flagship contribution
+- **Idea:** a **constant-size** observation frame that *moves* across the network. As it slides, the
+  antennas/users inside it change; each local window is solved on its current contents, and the whole
+  zone's solution is assembled from the sequence of local solves — a sliding-window, integral-like
+  assembly (imitating a physics/maths approach), *not* a frame that grows. Matches the constant moving
+  frame already in `telecomopt.antenna` (`frame_center`, `subnetwork_in_frame`, `move_frame`) and
+  `docs/Ideas/`.
+- **Why it's promising:** each solve stays small regardless of network size, so the per-window QUBO
+  fits a bounded qubit budget — the scalability story that makes QAOA credible beyond toy sizes.
+- **The hard part to test:** interference couples *across* frame boundaries, so a locally optimal
+  window can be globally suboptimal. Questions: frame size and step/overlap between successive
+  positions; how to treat antennas just outside the frame (fixed external interferers vs
+  included-but-frozen neighbours); does sweeping the frame and re-optimizing converge, and how close
+  to the global optimum (vs brute force on medium N)?
+- **Related methods to check:** domain decomposition, sliding-window / rolling-horizon optimization,
+  and clustering in [BL]/[A] ("optimize in clusters of 7–19 sites"). The moving frame is a principled,
+  quantum-budget-aware version of that clustering.
+- **QAOA integration (keep it hooked):** keep each per-window subproblem a clean `QUBO` so either a
+  classical solver or QAOA (`qcoptlib`) can solve the window — the frame method stays solver-agnostic,
+  and QAOA plugs in without reworking the decomposition.
+- **Stakes:** the project's flagship original contribution (the self-generated part, vs the rebuilt
+  physics). Test empirically once Stages 2–3 exist.
 
 ## OQ2 — Which objective, and how much physics to add
 - Single cell-edge sample (current showcase) vs [BL]'s sampled-user objective with 5% quantile and
