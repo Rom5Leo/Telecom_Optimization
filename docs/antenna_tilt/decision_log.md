@@ -156,6 +156,24 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   the map, and — importantly — excluded from the 1b domain/aggregation so the optimizer cannot be
   rewarded for an invalid part of the model. Revisit the exact value if a small-cell regime is added.
 
+## D10 — Stage 1b: demand + aggregation (telecomopt.coverage)
+- New module `telecomopt.coverage` (tests in `tests/test_coverage.py`): `sample_wedge` (cell-centred
+  polar grid with area elements), `uniform_demand` / `hotspot_demand` (ρ fields), the aggregation
+  primitives `weighted_mean` / `weighted_percentile` / `served_fraction`, `spectral_efficiency_field`
+  (single sector ⇒ SINR = SNR via `path_gain_2d_db`), and `coverage_report` (the three ρ-weighted
+  metrics). Notebook `02_one_antenna_users.ipynb`.
+- **Domain:** the sector's **±60° wedge** out to **half-ISD `d_max = 250 m`**, excluding `d_min` (D09) —
+  an honest stand-in for the region one of a site's three sectors owns; best-server replaces this hand
+  cutoff from Stage 2 (OQ4). Aggregation weight = demand × polar area element (uniform ρ ⇒ area metrics).
+- **Metrics kept separate (OQ9):** served fraction (threshold SE ≥ 1 bps/Hz), 5th-percentile cell-edge,
+  mean Shannon SE. Optimize tilt under **each** and report the coverage/capacity **frontier** — the
+  objectives disagree (capacity-optimal ≈ 9.5°, cell-edge-optimal ≈ 8° on uniform demand).
+- **Finding (expected, now shown):** in a lone noise-limited sector SE is 10.6–19 bps/Hz across the
+  wedge, so served-fraction **saturates at 100%** and can't rank tilts — it becomes a discriminating
+  metric only with interference (Stage 2). The 5th-percentile and mean carry 1b.
+- **Self-generated result:** the cell-edge-optimal tilt **tracks the demand** — ≈10.5° for near-tower
+  demand vs ≈8.5° for edge demand — the demand-driven CCO idea made concrete on our own model.
+
 ---
 
 # Open Questions
