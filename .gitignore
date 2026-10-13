@@ -52,3 +52,4 @@ docs/Ideas
 # cached QAOA solves (see cached_qaoa)
 qaoa_cache/
 docs/antenna_tilt/stage2a_kickoff.md
+cowork/
