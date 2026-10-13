@@ -5,7 +5,8 @@ can target: a demand field rho(x,y) over the sector's service region, and three 
 metrics computed from per-point spectral efficiency.
 
     served fraction         - share of demand clearing a service threshold (coverage/outage)
-    5th-percentile SE        - worst-served 5% of the demand-weighted distribution ("cell-edge" by
+    5th-percentile SE        - the SE *threshold* marking the lower 5% of the demand-weighted
+                               distribution (a boundary value, not the mean of the worst 5%; "cell-edge" by
                                convention; NOT necessarily the outermost points, and distinct from
                                [E]'s 5th-percentile-of-path-gain coverage)
     mean spectral efficiency - a capacity *proxy* (Shannon; true capacity also needs bandwidth,
@@ -20,6 +21,20 @@ from __future__ import annotations
 import numpy as np
 
 from telecomopt.rf import RFParams, DEFAULT_PARAMS, path_gain_2d_db
+
+
+def _as_weighted(values, weights):
+    """Shared contract for the weighted metrics: matching shapes, finite non-negative weights,
+    and a strictly positive total (else the weighted distribution is undefined)."""
+    values = np.asarray(values, float); weights = np.asarray(weights, float)
+    if values.shape != weights.shape:
+        raise ValueError(f"values and weights must share shape, got {values.shape} vs {weights.shape}")
+    if not np.all(np.isfinite(weights)) or np.any(weights < 0):
+        raise ValueError("weights must be finite and non-negative")
+    total = float(weights.sum())
+    if not total > 0.0:
+        raise ValueError("total weight must be > 0 (zero demand leaves the metric undefined)")
+    return values, weights, total
 
 
 def sample_wedge(d_min=35.0, d_max=250.0, half_az_deg=60.0, n_r=60, n_az=61):
@@ -52,8 +67,9 @@ def uniform_demand(dist, az_deg):
 
 
 def weighted_mean(values, weights):
-    """Weighted mean of `values` with non-negative `weights`."""
-    return float(np.average(np.asarray(values, float), weights=np.asarray(weights, float)))
+    """Weighted mean of `values` with finite non-negative `weights` (positive total)."""
+    values, weights, _ = _as_weighted(values, weights)
+    return float(np.average(values, weights=weights))
 
 
 def hotspot_demand(x, y, centers, sigmas, peaks, floor=0.0):
@@ -62,6 +78,10 @@ def hotspot_demand(x, y, centers, sigmas, peaks, floor=0.0):
     rho(x,y) = floor + sum_k  peak_k * exp( -((x-cx_k)^2 + (y-cy_k)^2) / (2 sigma_k^2) ).
     """
     x = np.asarray(x, dtype=float); y = np.asarray(y, dtype=float)
+    if not (len(centers) == len(sigmas) == len(peaks)):
+        raise ValueError("centers, sigmas and peaks must have equal length")
+    if any(sig <= 0 for sig in sigmas):
+        raise ValueError("hotspot sigmas must be positive")
     # start from the constant `floor`, then add one Gaussian bump per hotspot.
     rho = np.full_like(x, float(floor))
     for (cx, cy), s, p in zip(centers, sigmas, peaks):
@@ -75,7 +95,9 @@ def weighted_percentile(values, weights, q):
     over `values` sorted ascending, reaches q% of the total weight. Inverse-empirical-CDF (lower)
     convention, no interpolation — a different convention can give a slightly different discrete value.
     """
-    values = np.asarray(values, float); weights = np.asarray(weights, float)
+    if not (0.0 <= q <= 100.0):
+        raise ValueError("q must be in [0, 100]")
+    values, weights, _ = _as_weighted(values, weights)
     # sort by value, take the cumulative weight, find where it crosses q% of the total.
     order = np.argsort(values); v = values[order]; cw = np.cumsum(weights[order])
     cutoff = (q / 100.0) * cw[-1]; idx = int(np.searchsorted(cw, cutoff))
@@ -85,9 +107,9 @@ def weighted_percentile(values, weights, q):
 
 def served_fraction(values, weights, threshold):
     """Weighted fraction of points with value >= threshold."""
-    values = np.asarray(values, float); weights = np.asarray(weights, float)
+    values, weights, total = _as_weighted(values, weights)
     # total weight of points at/above the threshold, divided by the total weight.
-    return weights[values >= threshold].sum() / weights.sum()
+    return float(weights[values >= threshold].sum() / total)
 
 
 def spectral_efficiency_field(tilt_e_deg, dist, az_deg, params=DEFAULT_PARAMS, tilt_m_deg=0.0):

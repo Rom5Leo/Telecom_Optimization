@@ -165,14 +165,25 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - **Domain:** the sector's **±60° wedge** out to **half-ISD `d_max = 250 m`**, excluding `d_min` (D09) —
   an honest stand-in for the region one of a site's three sectors owns; best-server replaces this hand
   cutoff from Stage 2 (OQ4). Aggregation weight = demand × polar area element (uniform ρ ⇒ area metrics).
-- **Metrics kept separate (OQ9):** served fraction (threshold SE ≥ 1 bps/Hz), 5th-percentile cell-edge,
-  mean Shannon SE. Optimize tilt under **each** and report the coverage/capacity **frontier** — the
-  objectives disagree (capacity-optimal ≈ 9.5°, cell-edge-optimal ≈ 8° on uniform demand).
-- **Finding (expected, now shown):** in a lone noise-limited sector SE is 10.6–19 bps/Hz across the
-  wedge, so served-fraction **saturates at 100%** and can't rank tilts — it becomes a discriminating
-  metric only with interference (Stage 2). The 5th-percentile and mean carry 1b.
-- **Self-generated result:** the cell-edge-optimal tilt **tracks the demand** — ≈10.5° for near-tower
-  demand vs ≈8.5° for edge demand — the demand-driven CCO idea made concrete on our own model.
+- **Metrics, defined explicitly (OQ9):** `w_i = ρ_i·ΔA_i`, `p_i = w_i/Σw`; mean SE `Σp_i C_i` (a
+  **capacity proxy** — no bandwidth/scheduling/load); served fraction `Σp_i·1{C_i≥γ}`; 5th-pct
+  `inf{c: F_t(c)≥0.05}` — a **threshold** value (not the mean of the worst 5%), inverse-empirical-CDF
+  convention. Scale-invariant in ρ; polar area weighting essential. "cell-edge" is shorthand for the
+  lower tail (our SE definition, distinct from [E]'s path-gain coverage); γ = 1 bps/Hz is illustrative.
+  Input-contract guards added to the weighted metrics. All RF constants are [E] Table I (not our own).
+- **Finding — served fraction saturates here:** min SE over all locations and all swept tilts is
+  6.1 bps/Hz (10.6–19 across the wedge at 8°), so at γ=1 served fraction is 100% for every tilt — it
+  can't rank tilts *in this scenario* (not a law; distance/off-axis/shadowing/stricter bar could create
+  holes; interference *may* make it discriminate in Stage 2). Mean and 5th-pct carry 1b.
+- **Finding — plateau, not conflict:** mean-opt 9.5° (stable), 5th-pct-opt **8.0–8.5°** (shifts ~0.5°
+  with grid/tilt resolution — *stable under refinement*, not 0.25°-accurate). Only 4 of 33 tilts are
+  non-dominated, and committing to either optimum costs the other **~1%** — report the trade-off *size*,
+  not just differing argmaxes. **The exact angle matters less than the objective and demand chosen.**
+- **Finding — the 5th-pct tail is off-boresight, not "the edge":** worst-5% points span 73–248 m and
+  reach |az| ≈ 60°; dominated by large-azimuth (azimuth-pattern falloff) points.
+- **Self-generated result:** the 5th-pct-optimal tilt tracks demand (steeper near-tower, shallower edge)
+  but protects the whole weighted tail — background floor ~15% of weight — so it need not aim at the
+  hotspot centre. Demand-driven CCO (OQ9) on our own model, for *these* distributions.
 
 ---
 
@@ -195,6 +206,12 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   assembly (imitating a physics/maths approach), *not* a frame that grows. Matches the constant moving
   frame already in `telecomopt.antenna` (`frame_center`, `subnetwork_in_frame`, `move_frame`) and
   `docs/Ideas/`.
+- **Variant — topology-style cover (new idea):** instead of (or alongside) one sliding frame, **cover**
+  the zone with frames (possibly different sizes) whose interiors have empty pairwise overlap and whose
+  **union is the whole zone** — a partition/open-cover in the topological sense. Solve each frame, then
+  take the union. Same hard part: interference crosses the shared boundaries, so a true disjoint
+  partition needs a boundary-coupling rule (overlap seams or frozen neighbours) — a partition-of-unity
+  flavour. The moving frame is the "sliding" version; this is the "tiling" version.
 - **Why it's promising:** each solve stays small regardless of network size, so the per-window QUBO
   fits a bounded qubit budget — the scalability story that makes QAOA credible beyond toy sizes.
 - **The hard part to test:** interference couples *across* frame boundaries, so a locally optimal
