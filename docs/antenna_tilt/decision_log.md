@@ -185,6 +185,40 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   but protects the whole weighted tail — background floor ~15% of weight — so it need not aim at the
   hotspot centre. Demand-driven CCO (OQ9) on our own model, for *these* distributions.
 
+## D11 — Stage 2a: two-sector layout and interference assumptions
+- Choice: **two sites facing each other**, ISD 500 m — sector 1 at (0, 0) with boresight +x, sector 2
+  at (500, 0) with boresight −x. A *controlled* layout chosen because it makes the coupling easy to
+  interpret (symmetry gives analytic checks; one tilt can be varied against a fixed one) — not claimed
+  to be the layout with the strongest coupling. ISD/2 = 250 m matches 1b's `d_max` (D10). Co-located
+  sectors of one site (azimuth coupling, OQ3) are deferred.
+- Assumptions (stated, not derived): both sectors transmit simultaneously on the same resource;
+  received powers and noise refer to the same bandwidth (per PRB, [E] Table I); the receiver decodes
+  one serving sector and treats the other as interference; association = strongest received power
+  (best-server, OQ4), with no handover hysteresis, coordination or load balancing; shadowing deferred
+  (D06). Interference exists *because of* these assumptions, not merely because a second antenna exists.
+- Physics: `S_j = P·g_j`, serving = `argmax_j S_j`, `SINR = S_max / (Σ_{j≠serving} S_j + N)`,
+  `SE = log₂(1 + SINR)`. Two sectors ⇒ `SINR = S_max / (S_min + N)`.
+- Three quantities kept separate (the central lesson of 2a): **received-power maps** (how strongly each
+  sector reaches a point), the **association map** (which sector is strongest), and the **SINR map**
+  (how good the chosen link is given the other sector). An equal-power (association) boundary says
+  neither sector dominates; it says nothing about whether service is acceptable.
+- Probe results at t₁ = t₂ = 8° (deterministic, on the line between the sites):
+  - Equal powers at the midpoint ⇒ `SINR = S/(S+N) < 1` strictly, so SINR < 0 dB and SE < 1 bps/Hz;
+    both only *approach* 0 dB / 1 bps/Hz because S ≫ N (S/N ≈ 44 dB there). Computed min SE on the
+    line = 0.99997.
+  - At the sampled points (100, 250, 400 m) I/N = 33.6–44.4 dB ⇒ interference-limited **at those
+    points**; not yet checked over the whole map.
+  - The server identity at the midpoint flips 2→1→2 as t₁ rises with t₂ = 8°. With β = arctan(28.5/250)
+    ≈ 6.50° and both points on boresight at equal distance, equal power ⇔ `(β − t₁)² = (β − 8°)²` (main
+    lobe, unclipped), giving `t₁ = 8°` or `t₁ = 2β − 8° ≈ 5.01°` (root-found: 5.007°). Received power is
+    not monotone in a sector's own tilt. At an exact tie either label gives the same SINR; the code's
+    tie-break (lowest index) is bookkeeping only.
+  - Near sector 1 (100 m), S₁ is flat for t₁ ≤ 8° because the point lies on the constant −17 dB
+    elevation sidelobe floor — an artefact of the floor approximation (real antennas do radiate there,
+    but the model suppresses the angular detail), in the spirit of L01.
+- Consequence: Stage 2a code is written for N sectors and used with 2; 1b's aggregation is reused
+  unchanged in 2b, with SINR-based SE replacing SNR-based SE.
+
 ---
 
 # Open Questions
@@ -204,8 +238,7 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   antennas/users inside it change; each local window is solved on its current contents, and the whole
   zone's solution is assembled from the sequence of local solves — a sliding-window, integral-like
   assembly (imitating a physics/maths approach), *not* a frame that grows. Matches the constant moving
-  frame already in `telecomopt.antenna` (`frame_center`, `subnetwork_in_frame`, `move_frame`) and
-  `docs/Ideas/`.
+  frame already in `telecomopt.antenna` (`frame_center`, `subnetwork_in_frame`, `move_frame`).
 - **Variant — topology-style cover (new idea):** instead of (or alongside) one sliding frame, **cover**
   the zone with frames (possibly different sizes) whose interiors have empty pairwise overlap and whose
   **union is the whole zone** — a partition/open-cover in the topological sense. Solve each frame, then
@@ -276,6 +309,17 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   **5th-percentile** performance are separate numbers; **mean Shannon spectral efficiency** keeps that
   name (an idealized proxy) until bandwidth and resource sharing are introduced. Service thresholds are
   a modeling choice to state. Uncertainty analysis (D06) remains explicitly pending.
+
+## OQ10 — Service threshold under two-sector best-server
+- `C ≥ γ ⇔ SINR ≥ 2^γ − 1`; for γ = 1 bps/Hz this is `S_max ≥ S_min + N`. With two sectors and
+  best-server, `S_max ≥ S_min` always, so only a strip where the two powers are within ~N of each other
+  fails. On the line between the sites at 8°/8°, the fraction with SE < 1 is ≈ 2×10⁻⁵ (and with SE < 2
+  ≈ 13.5%). So γ = 1 is expected to stay near-saturated in 2a **by construction**, not because service
+  is good everywhere; sub-0-dB SINR first becomes common with ≥ 3 sectors (sum of interferers).
+- Hypothesis: a stricter, stated bar (e.g. γ = 2 bps/Hz ⇔ SINR ≈ 4.8 dB) makes served fraction
+  discriminate between tilt pairs in 2b. Test: served fraction vs (t₁, t₂) over the 2-D region for
+  several γ. Stakes: whether served fraction joins mean/5th-pct as a 2b objective, and which γ we
+  justify (a modelling choice, to be logged).
 
 ---
 
