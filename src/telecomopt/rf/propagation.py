@@ -254,4 +254,8 @@ def path_gain_2d_db(
     """2-D path gain (dB): g_dB = G0 + A - PL, where A is the relative pattern (pattern_gain_db)
     and G0 is the peak gain. Generalizes path_gain_db to azimuth (and mechanical tilt)."""
     beta = elevation_angle_deg(distance_m, params)
-    return params.g0_dbi + pattern_gain_db(beta, azimuth_deg, tilt_e_deg, tilt_m_deg) - path_loss_db(distance_m)
+    return (
+        params.g0_dbi
+        + pattern_gain_db(beta, azimuth_deg, tilt_e_deg, tilt_m_deg, params)
+        - path_loss_db(distance_m, params)
+    )

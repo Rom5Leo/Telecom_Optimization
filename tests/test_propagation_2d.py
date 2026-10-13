@@ -60,3 +60,17 @@ def test_pattern_floored_at_sll0():
 def test_pattern_azimuth_symmetry():
     b = _beta(200.0)
     assert np.isclose(pattern_gain_db(b, 25.0, 8.0, 0.0), pattern_gain_db(b, -25.0, 8.0, 0.0))
+
+
+def test_path_gain_2d_respects_custom_params():
+    # Regression: every term (G0, pattern, path loss) must use the params passed in,
+    # not the defaults. Compare against the closed form G0 + A - PL built from `custom`.
+    custom = RFParams(g0_dbi=15.0, hpbw_el=10.0, hpbw_az=90.0, pl_intercept=128.1, pl_slope=37.6)
+    d, az, te, tm = 200.0, 30.0, 6.0, 2.0
+    beta = _beta(d, custom)
+    pl = custom.pl_intercept + custom.pl_slope * np.log10(d / 1000.0)
+    expected = custom.g0_dbi + pattern_gain_db(beta, az, te, tm, custom) - pl
+    assert np.isclose(path_gain_2d_db(d, az, te, tm, custom), expected)
+    # and it must actually differ from the default-params result (the bug made these equal in part)
+    assert not np.isclose(path_gain_2d_db(d, az, te, tm, custom) - custom.g0_dbi,
+                          path_gain_2d_db(d, az, te, tm) - P.g0_dbi)
