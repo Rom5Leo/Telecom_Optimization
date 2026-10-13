@@ -16,8 +16,8 @@ A network can be larger than the region you want to look at or optimize. An
 window in local coordinates centred at ``frame_center``. Antenna *positions never move*; the
 frame just selects which antennas are currently in view (:attr:`antennas_in_frame`). For the
 alternative approach we keep the frame **constant** (set once around the network), and
-:meth:`move_frame` / :meth:`subnetwork_in_frame` are the hooks for the moving-frame extension
-described in ``docs/Ideas/moving_frame_antenna_network.md``.
+:meth:`move_frame` / :meth:`subnetwork_in_frame` are the hooks for a later moving-frame
+extension that sweeps a larger network zone by zone.
 """
 
 from __future__ import annotations
