@@ -5,9 +5,11 @@ can target: a demand field rho(x,y) over the sector's service region, and three 
 metrics computed from per-point spectral efficiency.
 
     served fraction         - share of demand clearing a service threshold (coverage/outage)
-    5th-percentile SE        - cell-edge: the worst-served 5% of demand ([E]'s coverage view)
-    mean spectral efficiency - capacity (an idealized Shannon proxy; name kept until bandwidth
-                               and resource sharing are modelled)
+    5th-percentile SE        - worst-served 5% of the demand-weighted distribution ("cell-edge" by
+                               convention; NOT necessarily the outermost points, and distinct from
+                               [E]'s 5th-percentile-of-path-gain coverage)
+    mean spectral efficiency - a capacity *proxy* (Shannon; true capacity also needs bandwidth,
+                               scheduling and load, none modelled here)
 
 Single sector => no interferers => SINR reduces to SNR (via path_gain_2d_db). The service
 region is the sector's +/- half-azimuth wedge out to d_max, excluding the near-tower floor
@@ -70,7 +72,8 @@ def hotspot_demand(x, y, centers, sigmas, peaks, floor=0.0):
 
 def weighted_percentile(values, weights, q):
     """The q-th weighted percentile (q in [0,100]): the smallest value whose cumulative weight,
-    over `values` sorted ascending, reaches q% of the total weight.
+    over `values` sorted ascending, reaches q% of the total weight. Inverse-empirical-CDF (lower)
+    convention, no interpolation — a different convention can give a slightly different discrete value.
     """
     values = np.asarray(values, float); weights = np.asarray(weights, float)
     # sort by value, take the cumulative weight, find where it crosses q% of the total.
