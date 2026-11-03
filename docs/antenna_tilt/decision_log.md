@@ -216,8 +216,33 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   - Near sector 1 (100 m), S₁ is flat for t₁ ≤ 8° because the point lies on the constant −17 dB
     elevation sidelobe floor — an artefact of the floor approximation (real antennas do radiate there,
     but the model suppresses the angular detail), in the spirit of L01.
+- Implementation: `telecomopt.network` — `Sector`, `to_sector_frame`, `received_power_mw`,
+  `best_server_sinr` (argmax serves, sum of the rest interferes), `sinr_field`, and the grid helpers
+  `exclusion_mask` (D09 floor around every mast) / `field_maps` (NaN-masked maps, `power_dbm[j]` per
+  sector). Tests in `tests/test_network.py` (exact reduction to 1a/1b, hand-worked SINR, midpoint
+  crossings, mirror symmetry). Notebook `03_two_sectors.ipynb`.
+- Findings from notebook 03 (deterministic, these parameters, t₂ = 8°; each explained by the depression
+  angle β at which sector 1 sees the point, and the elevation floor reached at |β − t₁| = 6.5·√(17/12)
+  ≈ 7.74°):
+  - **100 m (β ≈ 15.9°):** sector 1 serves at every tilt; I/N fixed at 33.6 dB. S₁ and SINR are flat until
+    t₁ ≈ 8.17° (sector 1 leaves its elevation floor), then rise — the flat stretch is a floor artefact.
+  - **250 m (β ≈ 6.50°):** serving label changes at 5.1° / 8.0° (0.1° grid) vs analytic 5.007° / 8°; SINR is
+    continuous with a ≈ 0 dB minimum at each tie.
+  - **400 m (β ≈ 4.08°):** sector 2 serves at every tilt; t₁ changes only the interference. SINR is lowest
+    (4.07 dB) at t₁ ≈ β, rises to 21.0 dB, flat from t₁ ≈ 11.8° (floor). So more downtilt at one sector
+    **hurts** a neighbour's user below that user's β, **helps** above it, and does **nothing** past the
+    floor edge (the last regime is a floor-approximation consequence). "More downtilt reduces
+    interference" is not true in general in this model.
+  - **Whole map at 8°/8°:** I/N ≥ 21.4 dB (≈ 138 × noise), median 31.8 dB at every valid grid point —
+    interference-limited over the mapped region, for this configuration.
+  - **Association is genuinely 2-D:** besides the bisector x = 250 m, there are off-axis regions where the
+    *farther* sector serves (84 grid points on sector 1's half at 8°/8°; much larger at 5°/8°). At
+    (35, 95) m sector 1 sees the point ~70° off boresight and below its beam, so G_az + G_el = −30.7 dB is
+    floored at SLL₀ = −30 dB, while sector 2 sees it near boresight (A = −6.3 dB): the ~24 dB pattern
+    advantage outweighs ~23.5 dB extra path loss (−82.0 vs −82.2 dBm). A boundary measured on the line
+    between the sites cannot stand in for the 2-D association map.
 - Consequence: Stage 2a code is written for N sectors and used with 2; 1b's aggregation is reused
-  unchanged in 2b, with SINR-based SE replacing SNR-based SE.
+  unchanged in 2b, with SINR-based SE replacing SNR-based SE. Stage 2a is closed on these findings.
 
 ---
 
@@ -316,6 +341,11 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   fails. On the line between the sites at 8°/8°, the fraction with SE < 1 is ≈ 2×10⁻⁵ (and with SE < 2
   ≈ 13.5%). So γ = 1 is expected to stay near-saturated in 2a **by construction**, not because service
   is good everywhere; sub-0-dB SINR first becomes common with ≥ 3 sectors (sum of interferers).
+- Measurement caveat (from notebook 03): near the midpoint at 8°/8°, failing γ = 1 needs
+  |S₁ − S₂| < 0.00016 dB while S₁ − S₂ changes by ≈ 0.165 dB/m, so the failing strip on the line is
+  **≈ 1.9 mm** wide. A 5 m map grid that samples x = 250 exactly would count it as a 5 m column — an
+  overstatement of ~2500×. Served fraction must therefore be measured as a demand-weighted integral on a
+  resolution-checked grid (or from the analytic strip width), not by counting failed map pixels.
 - Hypothesis: a stricter, stated bar (e.g. γ = 2 bps/Hz ⇔ SINR ≈ 4.8 dB) makes served fraction
   discriminate between tilt pairs in 2b. Test: served fraction vs (t₁, t₂) over the 2-D region for
   several γ. Stakes: whether served fraction joins mean/5th-pct as a 2b objective, and which γ we
