@@ -130,4 +130,33 @@ def coverage_report(tilt_e_deg, dist, az_deg, demand, area, threshold=1.0,
     return {"mean_se": weighted_mean(se, w),
             "p5_se": weighted_percentile(se, w, 5.0),
             "served_fraction": served_fraction(se, w, threshold)}
-    
+
+
+def non_dominated(*objectives):
+    """Pareto mask: True for the options that no other option dominates (all objectives MAXIMIZED).
+
+    Option j **dominates** option i when it is no worse on every objective and strictly better on at
+    least one. The non-dominated set is the Pareto front — the genuine trade-off; every other option can
+    be discarded before trading objectives off. Exact ties are not dominated (both are kept).
+
+    Parameters
+    ----------
+    *objectives : one array per objective, all the same shape (e.g. mean SE and 5th-pct SE over a tilt
+                  sweep, or over a (t1, t2) grid). Minimize an objective by passing its negative.
+
+    Returns a boolean array with the shape of the inputs. Pairwise comparison: O(n^2) time and memory,
+    fine up to a few thousand options.
+    """
+    if not objectives:
+        raise ValueError("need at least one objective")
+    arrays = [np.asarray(o, dtype=float) for o in objectives]
+    shape = arrays[0].shape
+    if any(a.shape != shape for a in arrays):
+        raise ValueError(f"all objectives must share shape, got {[a.shape for a in arrays]}")
+    F = np.column_stack([a.ravel() for a in arrays])          # (n_options, n_objectives)
+    if not np.all(np.isfinite(F)):
+        raise ValueError("objective values must be finite")
+    no_worse = np.all(F[:, None, :] >= F[None, :, :], axis=2)   # [j, i]: j >= i on every objective
+    better = np.any(F[:, None, :] > F[None, :, :], axis=2)      # [j, i]: j > i on at least one
+    dominated = np.any(no_worse & better, axis=0)               # some j dominates i
+    return (~dominated).reshape(shape)

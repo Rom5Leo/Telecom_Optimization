@@ -4,8 +4,9 @@ import numpy as np
 from telecomopt.coverage import (
     sample_wedge, to_xy, uniform_demand, hotspot_demand,
     weighted_mean, weighted_percentile, served_fraction,
-    spectral_efficiency_field, coverage_report,
+    spectral_efficiency_field, coverage_report, non_dominated,
 )
+import pytest
 
 
 def test_sample_wedge_shape_and_area():
@@ -69,3 +70,50 @@ def test_demand_weighting_changes_the_optimum():
     best_edge = tilts[np.argmax([coverage_report(t, dist, az, edge, area)["p5_se"] for t in tilts])]
     best_near = tilts[np.argmax([coverage_report(t, dist, az, near, area)["p5_se"] for t in tilts])]
     assert best_edge <= best_near   # edge demand -> shallower tilt reaches further out
+
+
+def _brute_force_front(F):
+    """Reference: the definition, one option at a time."""
+    n = len(F); keep = np.ones(n, bool)
+    for i in range(n):
+        for j in range(n):
+            if np.all(F[j] >= F[i]) and np.any(F[j] > F[i]):
+                keep[i] = False
+    return keep
+
+
+def test_non_dominated_hand_worked():
+    a = np.array([1.0, 2.0, 3.0, 2.0])
+    b = np.array([3.0, 2.0, 1.0, 1.0])
+    # (2, 1) is dominated by (2, 2): equal on a, better on b. The other three trade off.
+    assert non_dominated(a, b).tolist() == [True, True, True, False]
+
+
+def test_non_dominated_ties_are_kept_and_equal_better_dominates():
+    assert non_dominated([1.0, 1.0], [2.0, 2.0]).tolist() == [True, True]     # exact duplicates
+    assert non_dominated([1.0, 1.0], [2.0, 3.0]).tolist() == [False, True]    # equal a, better b
+
+
+def test_non_dominated_single_objective_is_argmax_set():
+    v = np.array([3.0, 5.0, 1.0, 5.0])
+    assert non_dominated(v).tolist() == [False, True, False, True]
+
+
+def test_non_dominated_matches_brute_force():
+    rng = np.random.default_rng(1)
+    for k in (2, 3):
+        F = rng.integers(0, 6, size=(40, k)).astype(float)       # integers -> many ties
+        assert np.array_equal(non_dominated(*F.T), _brute_force_front(F))
+
+
+def test_non_dominated_keeps_grid_shape():
+    t1, t2 = np.meshgrid(np.arange(4.0), np.arange(3.0))
+    mask = non_dominated(t1, -t2)                    # maximize t1, minimize t2
+    assert mask.shape == (3, 4)
+    assert mask.sum() == 1 and mask[0, 3]            # unique best corner: t1 = 3, t2 = 0
+
+
+@pytest.mark.parametrize("args", [(), ([1.0, 2.0], [1.0]), ([1.0, np.nan], [1.0, 2.0])])
+def test_non_dominated_guards(args):
+    with pytest.raises(ValueError):
+        non_dominated(*args)
