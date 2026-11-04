@@ -100,6 +100,41 @@ def received_power_mw(x, y, sector: Sector, tilt_e_deg: float, tilt_m_deg: float
 
 
 
+def power_table(x, y, sector: Sector, tilts_e_deg, tilt_m_deg: float = 0.0,
+                params: RFParams = DEFAULT_PARAMS):
+    """Received power of ONE sector at every point, for every candidate electrical tilt (Stage 2b).
+
+    Parameters
+    ----------
+    x, y        : ground coordinates (m), same shape; flattened to ``n_points``.
+    sector      : the :class:`Sector` whose power is tabulated.
+    tilts_e_deg : 1-D sequence of candidate electrical tilts (deg), finite, at least one.
+    tilt_m_deg  : mechanical tilt (deg), a single value used for every row.
+
+    Returns an array of shape ``(n_tilts, n_points)`` in mW; row ``k`` is
+    ``received_power_mw(x, y, sector, tilts_e_deg[k], tilt_m_deg, params)``.
+
+    Why a table: the power of a sector depends only on **its own** tilt, so a two-sector sweep over
+    (t1, t2) needs one table per sector, not one field evaluation per pair. The pair (i, j) is
+    ``np.stack([table_1[i], table_2[j]])``, ready for :func:`best_server_sinr`.
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    if x.shape != y.shape:
+        raise ValueError(f"x and y must share shape, got {x.shape} vs {y.shape}")
+    tilts = np.asarray(tilts_e_deg, dtype=float)
+    if tilts.ndim != 1 or tilts.size < 1 or not np.all(np.isfinite(tilts)):
+        raise ValueError("tilts_e_deg must be a non-empty 1-D sequence of finite values")
+
+    x = x.ravel()
+    y = y.ravel()
+
+    list_of_arrays = [received_power_mw(x, y, sector, tilt, tilt_m_deg, params) for tilt in tilts]
+    table = np.stack(list_of_arrays)
+
+    return table
+
+
 def best_server_sinr(powers_mw, noise_mw: float):
     """Best-server association and SINR from per-sector received powers.
 

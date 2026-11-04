@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from telecomopt.rf import DEFAULT_PARAMS, RFParams, path_gain_2d_db
-from telecomopt.coverage import sample_wedge, to_xy, spectral_efficiency_field
+from telecomopt.coverage import sample_wedge, sample_rectangle, to_xy, spectral_efficiency_field
 from telecomopt.network import (
     Sector, to_sector_frame, received_power_mw, best_server_sinr, sinr_field,
-    exclusion_mask, field_maps,
+    exclusion_mask, field_maps, power_table,
 )
 
 P = DEFAULT_PARAMS
@@ -211,3 +211,67 @@ def test_field_maps_any_number_of_sectors():
     m = field_maps(X, Y, [S1], [8.0])
     assert m["power_dbm"].shape == (1,) + X.shape
     assert np.all(m["serving"][m["valid"]] == 0.0)
+
+
+# --- power_table (Stage 2b: separable tilt sweep) ---------------------------------------------
+
+def _grid_2d():
+    """A small 2-D grid of valid points between the two sites (shape (4, 5))."""
+    X, Y = np.meshgrid(np.linspace(60.0, 440.0, 4), np.linspace(-120.0, 120.0, 5), indexing="ij")
+    return X, Y
+
+
+def test_power_table_shape_and_rows_equal_direct_calls():
+    X, Y = _grid_2d()
+    tilts = [2.0, 5.0, 8.0]
+    table = power_table(X, Y, S1, tilts)
+    assert table.shape == (3, X.size)                         # 2-D input is flattened to n_points
+    assert np.all(np.isfinite(table)) and np.all(table > 0.0)
+    for k, t in enumerate(tilts):
+        assert np.allclose(table[k], received_power_mw(X.ravel(), Y.ravel(), S1, t), rtol=1e-12)
+
+
+def test_power_table_rows_follow_the_order_of_the_tilts():
+    X, Y = _grid_2d()
+    forward = power_table(X, Y, S1, [3.0, 6.0, 9.0])
+    backward = power_table(X, Y, S1, [9.0, 6.0, 3.0])
+    assert np.allclose(forward, backward[::-1])
+    assert not np.allclose(forward[0], forward[1])            # different tilts, different power
+
+
+def test_power_table_rows_reproduce_the_joint_field_powers():
+    # separability: the pair (t1, t2) needs only row t1 of sector 1's table and row t2 of sector 2's
+    X, Y = _grid_2d()
+    t1, t2 = 4.0, 9.0
+    joint = sinr_field(X, Y, [S1, S2], [t1, t2])["powers"]
+    stacked = np.stack([power_table(X, Y, S1, [t1, 7.0])[0], power_table(X, Y, S2, [3.0, t2])[1]])
+    assert np.allclose(stacked, joint, rtol=1e-12)
+
+
+def test_power_table_mirror_symmetry_of_the_facing_sites():
+    # on a mirror-symmetric grid, sector 2's table is sector 1's table reflected x -> 500 - x
+    nx, ny = 10, 6
+    x, y, _ = sample_rectangle(0.0, 500.0, -250.0, 250.0, nx, ny)
+    tilts = [2.0, 5.0, 8.0]
+    t1 = power_table(x, y, S1, tilts).reshape(len(tilts), nx, ny)
+    t2 = power_table(x, y, S2, tilts).reshape(len(tilts), nx, ny)
+    assert np.allclose(t2, t1[:, ::-1, :], rtol=1e-9)
+
+
+def test_power_table_passes_the_mechanical_tilt_through():
+    X, Y = _grid_2d()
+    table = power_table(X, Y, S1, [4.0, 8.0], tilt_m_deg=3.0)
+    for k, t in enumerate([4.0, 8.0]):
+        assert np.allclose(table[k], received_power_mw(X.ravel(), Y.ravel(), S1, t, 3.0), rtol=1e-12)
+    assert not np.allclose(table, power_table(X, Y, S1, [4.0, 8.0]))   # mechanical tilt matters
+
+
+@pytest.mark.parametrize("tilts", [[], [[1.0, 2.0]], [1.0, np.nan], [np.inf]])
+def test_power_table_tilt_guards(tilts):
+    with pytest.raises(ValueError):
+        power_table(np.zeros(3) + 100.0, np.zeros(3), S1, tilts)
+
+
+def test_power_table_shape_mismatch_raises():
+    with pytest.raises(ValueError):
+        power_table(np.zeros(3), np.zeros(4), S1, [5.0])
