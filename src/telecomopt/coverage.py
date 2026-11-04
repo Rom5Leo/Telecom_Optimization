@@ -55,6 +55,43 @@ def sample_wedge(d_min=35.0, d_max=250.0, half_az_deg=60.0, n_r=60, n_az=61):
     return dist, az_deg, area
 
 
+def sample_rectangle(x_min, x_max, y_min, y_max, nx, ny):
+    """Cell-centred grid over an axis-aligned rectangle. Returns (x, y, area) flat arrays.
+
+    The Cartesian counterpart of :func:`sample_wedge`: [x_min, x_max] x [y_min, y_max] is split
+    into ``nx`` x ``ny`` equal cells; every point is a cell centre (midpoint rule) and ``area`` is
+    the cell area, so a uniform demand sums to the rectangle area. Bounds are arbitrary
+    (e.g. y in [-a, b]); symmetric bounds give a mirror-symmetric point set.
+
+    Ordering: x-major, ``k = i * ny + j`` is the centre of column ``i`` (x) and row ``j`` (y), so
+    ``x.reshape(nx, ny)`` is the map layout (axis 0 = x, axis 1 = y).
+
+    No sample lies on the boundary. For odd ``nx`` a column of samples falls exactly on the
+    mid-line x = (x_min + x_max) / 2 — the tie line of the two-site layout (D11) — so use even ``nx``
+    there. The near-tower exclusion (D09) is not applied here: it enters as zero weight.
+    """
+    for name, v in (("x_min", x_min), ("x_max", x_max), ("y_min", y_min), ("y_max", y_max)):
+        if not np.isfinite(v):
+            raise ValueError(f"{name} must be finite, got {v}")
+    if not (x_max > x_min and y_max > y_min):
+        raise ValueError("need x_max > x_min and y_max > y_min")
+    for name, n in (("nx", nx), ("ny", ny)):
+        if not (isinstance(n, (int, np.integer)) and n >= 1):
+            raise ValueError(f"{name} must be an integer >= 1, got {n!r}")
+
+    width, height = x_max - x_min, y_max - y_min
+    dx, dy = width / nx, height / ny
+
+    xc = x_min + np.arange(nx) * dx + 0.5 * dx
+    yc = y_min + np.arange(ny) * dy + 0.5 * dy
+    x, y = np.meshgrid(xc, yc, indexing="ij")
+    x = x.ravel()
+    y = y.ravel()
+    area = np.full(len(x), dx * dy)
+
+    return (x, y, area)
+
+
 def to_xy(dist, az_deg):
     """Ground coordinates from polar (boresight = +x)."""
     phi = np.radians(az_deg)

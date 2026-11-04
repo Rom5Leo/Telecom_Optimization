@@ -244,6 +244,38 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - Consequence: Stage 2a code is written for N sectors and used with 2; 1b's aggregation is reused
   unchanged in 2b, with SINR-based SE replacing SNR-based SE. Stage 2a is closed on these findings.
 
+## D12 — Stage 2b: region, grid, tilt range and sweep design
+- **Region:** R = [0, 500] × [−250, 250] m, the area of the 2a maps. It is mirror-symmetric about the tie
+  line x = 250 and about y = 0. The extent is a **modelling choice**, not a reference constant; its
+  influence is tested after the baseline by changing only the y half-width (150 / 250 / 400 m) at a fixed
+  5 m cell size.
+- **Grid:** cell-centred (midpoint rule), 100 × 100 cells of 5 m (`telecomopt.coverage.sample_rectangle`),
+  uniform area weights; even `nx`, so no sample lies on the tie line x = 250. Points inside the D09 floor
+  of either mast get zero weight. Resolution is checked by refining the grid alone (50², 100², 200²) with
+  the tilt step fixed; the strongest claim made is "stable under this refinement".
+- **Tilt range:** electrical tilt 0–10° in 0.5° steps (21 values, 441 pairs), taken from the ≲ 10° limit
+  quoted for [E] in `domain_primer.md` (to be checked against the paper, including the sign convention);
+  mechanical tilt 0. A wider 2–18° sweep is run once and labelled a **model-exploration** range, to show
+  whether an optimum at the 10° edge is constraint-active. Feasibility is stated separately from the
+  optimum.
+- **Separable sweep:** the received power of sector j depends only on its own tilt, so one power table per
+  sector (n_tilts × n_points) is computed once and every pair (t₁, t₂) is formed by stacking one row of
+  each; SE is cached per pair, so changing the demand only changes the weights.
+- **Metrics:** the 1b definitions are unchanged (demand-weighted mean SE, 5th-percentile SE), now on the
+  SINR-based SE field. Served fraction enters only as a demand-weighted integral with a stated γ (OQ10).
+  Pareto fronts are read on the half-grid t₁ ≤ t₂, since `non_dominated` keeps exact ties and every
+  unequal pair has an equally good mirror twin.
+- **Correctness checks planned before reading any landscape:** J(t₁, t₂) = J(t₂, t₁) on the symmetric setup
+  (region, grid and demand all mirror-symmetric); the sweep equals the direct `sinr_field` + 1b metrics at
+  sample pairs; sector 2's power table equals sector 1's reflected in x.
+- **Hypotheses recorded before the sweep (to be tested, not assumed):** H1 — where the map is
+  interference-limited, SE ≈ log₂(1 + S_max/S_min) depends on the power *ratio* of the two sectors, so an
+  unequal-tilt optimum is possible, with an equally good reflected twin. H2 — the 5th percentile is set
+  near the association boundary (2a: about 13.5 % of the line between the sites has SE < 2 at 8°/8°), so it
+  is more sensitive to the geometry of that boundary than the mean is.
+- **Demand cases:** uniform first; then hotspots (OQ11). Uncertainty (D06) remains a separate pending layer;
+  all 2b results are deterministic, median-link.
+
 ---
 
 # Open Questions
@@ -350,6 +382,19 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   discriminate between tilt pairs in 2b. Test: served fraction vs (t₁, t₂) over the 2-D region for
   several γ. Stakes: whether served fraction joins mean/5th-pct as a 2b objective, and which γ we
   justify (a modelling choice, to be logged).
+
+## OQ11 — Does the preferred joint tilt follow the demand?
+- Hypothesis: moving demand changes the preferred (t₁, t₂). A hotspot in one sector's own area isolates the
+  coupling: if the *other* sector's preferred tilt moves, it can only be through interference.
+- Test: a single hand-placed hotspot is one case and cannot be generalised. Draw K hotspot centres from a
+  seeded RNG (distribution over the valid cells to be stated), with σ and peak fixed so that the hotspot
+  holds a stated share of the total demand (≈ 30 % for σ = 60 m, peak 5 over a floor of 1). For each draw
+  record the argmax of each objective and the cost, on that draw's objective, of using the uniform-demand
+  optimum. Report distributions over the draws. Mirror-image draws (x → 500 − x) must give mirrored
+  results, a free consistency check. Define "the optimum moves" (e.g. by at least one tilt step) and
+  "consequential" (a cost threshold) **before** running; check that the summary is stable when K is halved.
+- Stakes: whether a demand-aware joint tilt is worth more than the uniform-demand one, or whether the
+  landscape is a plateau as it was for one sector (D10).
 
 ---
 

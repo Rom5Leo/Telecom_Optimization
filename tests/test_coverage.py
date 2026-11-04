@@ -2,7 +2,7 @@
 import numpy as np
 
 from telecomopt.coverage import (
-    sample_wedge, to_xy, uniform_demand, hotspot_demand,
+    sample_wedge, sample_rectangle, to_xy, uniform_demand, hotspot_demand,
     weighted_mean, weighted_percentile, served_fraction,
     spectral_efficiency_field, coverage_report, non_dominated,
 )
@@ -117,3 +117,87 @@ def test_non_dominated_keeps_grid_shape():
 def test_non_dominated_guards(args):
     with pytest.raises(ValueError):
         non_dominated(*args)
+
+
+# ---- sample_rectangle (Stage 2b) -----------------------------------------------------------
+
+def test_sample_rectangle_hand_worked():
+    # [0, 4] x [0, 2] in 2 x 2 cells: dx = 2, dy = 1, centres x = 1, 3 and y = 0.5, 1.5; x-major order.
+    x, y, area = sample_rectangle(0.0, 4.0, 0.0, 2.0, 2, 2)
+    assert x.tolist() == [1.0, 1.0, 3.0, 3.0]
+    assert y.tolist() == [0.5, 1.5, 0.5, 1.5]
+    assert area.tolist() == [2.0, 2.0, 2.0, 2.0]
+
+
+def test_sample_rectangle_shapes_and_total_area():
+    x, y, area = sample_rectangle(0.0, 500.0, -250.0, 250.0, 100, 80)
+    assert x.shape == y.shape == area.shape == (100 * 80,)
+    assert np.isclose(area.sum(), 500.0 * 500.0)
+
+
+def test_sample_rectangle_map_layout_is_x_major():
+    nx, ny = 6, 4
+    x, y, _ = sample_rectangle(0.0, 6.0, 0.0, 4.0, nx, ny)
+    X, Y = x.reshape(nx, ny), y.reshape(nx, ny)
+    assert np.allclose(X, X[:, [0]])                   # x is constant along axis 1 (y)
+    assert np.allclose(Y, Y[[0], :])                   # y is constant along axis 0 (x)
+    assert np.allclose(X[:, 0], np.arange(nx) + 0.5)
+    assert np.allclose(Y[0, :], np.arange(ny) + 0.5)
+
+
+def test_sample_rectangle_points_are_strictly_inside():
+    x, y, _ = sample_rectangle(-100.0, 300.0, 20.0, 70.0, 40, 10)
+    assert x.min() > -100.0 and x.max() < 300.0
+    assert y.min() > 20.0 and y.max() < 70.0
+
+
+def test_sample_rectangle_is_mirror_symmetric_about_the_midline():
+    x_min, x_max = 0.0, 500.0
+    x, y, area = sample_rectangle(x_min, x_max, -250.0, 250.0, 100, 100)
+
+    def as_set(px, py):
+        pts = np.round(np.column_stack([px, py]), 9)
+        return pts[np.lexsort((pts[:, 1], pts[:, 0]))]
+
+    assert np.allclose(as_set(x_min + x_max - x, y), as_set(x, y))     # x -> 500 - x
+    assert np.allclose(as_set(x, -y), as_set(x, y))                    # y -> -y
+    assert np.allclose(area, area[0])                                  # equal cells
+
+
+def test_sample_rectangle_midline_sampled_only_for_odd_nx():
+    mid = 250.0
+    x_even, _, _ = sample_rectangle(0.0, 500.0, -250.0, 250.0, 100, 4)
+    x_odd, _, _ = sample_rectangle(0.0, 500.0, -250.0, 250.0, 101, 4)
+    assert not np.any(np.isclose(x_even, mid))
+    assert np.any(np.isclose(x_odd, mid))
+
+
+def test_sample_rectangle_midpoint_rule_integrals():
+    # exact for functions linear in each variable ...
+    x_min, x_max, y_min, y_max = -100.0, 300.0, -50.0, 150.0
+    x, y, a = sample_rectangle(x_min, x_max, y_min, y_max, 37, 23)
+    assert np.isclose((a * x).sum(), (x_max**2 - x_min**2) / 2 * (y_max - y_min))
+    assert np.isclose((a * x * y).sum(),
+                      (x_max**2 - x_min**2) / 2 * (y_max**2 - y_min**2) / 2)
+    # ... and for x^2 the error is known: sum = integral - L * dx^2 / 12 (per-cell h^3/12 term).
+    nx = 20
+    x, y, a = sample_rectangle(0.0, 10.0, 0.0, 1.0, nx, 5)
+    dx = 10.0 / nx
+    assert np.isclose((a * x**2).sum(), 10.0**3 / 3 - 10.0 * dx**2 / 12)
+
+
+def test_sample_rectangle_asymmetric_bounds_and_single_cell():
+    x, y, a = sample_rectangle(-3.0, 5.0, 10.0, 12.0, 1, 1)
+    assert (x.tolist(), y.tolist(), a.tolist()) == ([1.0], [11.0], [16.0])
+
+
+@pytest.mark.parametrize("args", [
+    (5.0, 5.0, 0.0, 1.0, 4, 4),          # empty in x
+    (0.0, 1.0, 2.0, 1.0, 4, 4),          # reversed y
+    (0.0, np.inf, 0.0, 1.0, 4, 4),       # non-finite
+    (0.0, 1.0, 0.0, 1.0, 0, 4),          # no cells
+    (0.0, 1.0, 0.0, 1.0, 4, 2.5),        # non-integer count
+])
+def test_sample_rectangle_guards(args):
+    with pytest.raises(ValueError):
+        sample_rectangle(*args)
