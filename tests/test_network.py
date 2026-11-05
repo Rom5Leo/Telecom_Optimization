@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from telecomopt.rf import DEFAULT_PARAMS, RFParams, path_gain_2d_db
-from telecomopt.coverage import sample_wedge, sample_rectangle, to_xy, spectral_efficiency_field
+from telecomopt.coverage import sweep_metrics, sample_wedge, sample_rectangle, to_xy, spectral_efficiency_field
 from telecomopt.network import (
     Sector, to_sector_frame, received_power_mw, best_server_sinr, sinr_field,
-    exclusion_mask, field_maps, power_table,
+    exclusion_mask, field_maps, power_table, se_cube,
 )
 
 P = DEFAULT_PARAMS
@@ -275,3 +275,90 @@ def test_power_table_tilt_guards(tilts):
 def test_power_table_shape_mismatch_raises():
     with pytest.raises(ValueError):
         power_table(np.zeros(3), np.zeros(4), S1, [5.0])
+
+
+# --- se_cube (Stage 2b: SE of every tilt combination) ----------------------------------------
+
+def test_se_cube_shape():
+    rng = np.random.default_rng(0)
+    cube = se_cube([rng.uniform(0.1, 5.0, (3, 12)), rng.uniform(0.1, 5.0, (4, 12))], 0.5)
+    assert cube.shape == (3, 4, 12)
+
+
+def test_se_cube_hand_worked_two_sectors():
+    # two points, two tilts per sector, noise 0.5. SINR = max / (min + 0.5) at each point:
+    #   pair (0,0): powers (1,2) and (5,2)    -> 2/1.5, 5/2.5
+    #   pair (0,1): powers (1,0.5) and (5,4)  -> 1/1.0, 5/4.5
+    #   pair (1,0): powers (3,2) and (1,2)    -> 3/2.5, 2/1.5
+    #   pair (1,1): powers (3,0.5) and (1,4)  -> 3/1.0, 4/1.5
+    t1 = np.array([[1.0, 5.0], [3.0, 1.0]])
+    t2 = np.array([[2.0, 2.0], [0.5, 4.0]])
+    cube = se_cube([t1, t2], 0.5)
+    sinr = np.array([[[4 / 3, 2.0], [1.0, 5 / 4.5]],
+                     [[1.2, 4 / 3], [3.0, 8 / 3]]])
+    assert np.allclose(cube, np.log2(1.0 + sinr))
+
+
+def test_se_cube_matches_the_direct_field_at_every_pair():
+    X, Y = _grid_2d()
+    tilts1, tilts2 = [3.0, 6.0, 9.0], [2.0, 8.0]
+    cube = se_cube([power_table(X, Y, S1, tilts1), power_table(X, Y, S2, tilts2)], N_MW)
+    assert cube.shape == (3, 2, X.size)
+    for i, a in enumerate(tilts1):
+        for j, b in enumerate(tilts2):
+            assert np.allclose(cube[i, j], sinr_field(X, Y, [S1, S2], [a, b])["se"], rtol=1e-12)
+
+
+def test_se_cube_mirror_symmetry_swaps_the_tilts():
+    # equal tilt lists, mirror-symmetric grid: swapping (t1, t2) reflects the SE map in x
+    nx, ny = 10, 6
+    x, y, _ = sample_rectangle(0.0, 500.0, -250.0, 250.0, nx, ny)
+    tilts = [2.0, 5.0, 8.0]
+    cube = se_cube([power_table(x, y, S1, tilts), power_table(x, y, S2, tilts)], N_MW)
+    maps = cube.reshape(3, 3, nx, ny)
+    for i in range(3):
+        for j in range(3):
+            assert np.allclose(maps[i, j], maps[j, i, ::-1, :], rtol=1e-9)
+
+
+def test_se_cube_any_number_of_sectors():
+    rng = np.random.default_rng(3)
+    tabs = [rng.uniform(0.1, 5.0, (n, 6)) for n in (2, 3, 2)]
+    cube = se_cube(tabs, 0.5)
+    assert cube.shape == (2, 3, 2, 6)
+    _, sinr = best_server_sinr(np.stack([tabs[0][1], tabs[1][2], tabs[2][0]]), 0.5)
+    assert np.allclose(cube[1, 2, 0], np.log2(1.0 + sinr))
+
+
+def test_se_cube_one_sector_is_snr():
+    p = np.array([[1.0, 2.0, 4.0], [0.5, 8.0, 3.0]])
+    cube = se_cube([p], 0.25)
+    assert cube.shape == (2, 3)
+    assert np.allclose(cube, np.log2(1.0 + p / 0.25))
+
+
+@pytest.mark.parametrize("tables, noise", [
+    ([], 0.5),                                           # no sectors
+    ([np.ones(5)], 0.5),                                 # not 2-D
+    ([np.ones((2, 5)), np.ones((2, 4))], 0.5),           # different n_points
+    ([np.ones((2, 5))], 0.0),                            # no noise
+    ([np.ones((2, 5))], np.nan),
+])
+def test_se_cube_guards(tables, noise):
+    with pytest.raises(ValueError):
+        se_cube(tables, noise)
+
+
+# --- the Stage 2b symmetry check: J(t1, t2) = J(t2, t1) --------------------------------------
+
+def test_joint_objectives_are_symmetric_in_the_two_tilts():
+    # region, grid, demand (uniform) and the D09 mask are all mirror-symmetric about x = 250
+    nx, ny = 20, 20
+    x, y, area = sample_rectangle(0.0, 500.0, -250.0, 250.0, nx, ny)
+    weights = area * exclusion_mask(x, y, [S1, S2])
+    tilts = np.arange(2.0, 11.0, 1.0)
+    cube = se_cube([power_table(x, y, S1, tilts), power_table(x, y, S2, tilts)], N_MW)
+    out = sweep_metrics(cube, weights)
+    for key in ("mean_se", "p5_se"):
+        assert np.allclose(out[key], out[key].T, rtol=1e-9, atol=1e-12)
+    assert not np.allclose(out["mean_se"], out["mean_se"][0, 0])    # the landscape is not flat

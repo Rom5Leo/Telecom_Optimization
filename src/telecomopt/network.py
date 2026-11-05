@@ -210,6 +210,58 @@ def sinr_field(x, y, sectors, tilts_e_deg, tilts_m_deg=None, params: RFParams = 
     return {"powers": powers, "serving": serving, "sinr": sinr, "se": se}
 
 
+def se_cube(tables, noise_mw: float):
+    """Spectral efficiency of every tilt combination at every point (Stage 2b).
+
+    Parameters
+    ----------
+    tables   : sequence of arrays, one per sector; ``tables[s]`` has shape ``(n_s, n_points)`` — the
+               :func:`power_table` of sector ``s`` (row = candidate tilt, mW). All share ``n_points``.
+    noise_mw : noise power in the same bandwidth (mW), > 0; the same value :func:`sinr_field` uses,
+               ``10 ** (params.n0_dbm / 10)``.
+
+    Returns an array of shape ``(n_1, ..., n_N, n_points)``: entry ``cube[i, j, ..., :]`` is
+    ``log2(1 + SINR)`` at every point when sector 1 uses its tilt number ``i``, sector 2 its tilt number
+    ``j``, and so on — best-server association and interference exactly as in :func:`best_server_sinr`.
+
+    Nothing here depends on demand, so one cube serves every demand field (weights enter later).
+    Memory grows as ``n_1 * ... * n_N * n_points`` floats: fine for two sectors, a hard limit beyond.
+    """
+    tables = [np.asarray(t, dtype=float) for t in tables]
+    if len(tables) < 1:
+        raise ValueError("need at least one power table")
+    if any(t.ndim != 2 or t.shape[0] < 1 for t in tables):
+        raise ValueError("every table must have shape (n_tilts, n_points) with n_tilts >= 1")
+    n_points = tables[0].shape[1]
+    if any(t.shape[1] != n_points for t in tables):
+        raise ValueError(f"tables must share n_points, got {[t.shape[1] for t in tables]}")
+    if not (np.isfinite(noise_mw) and noise_mw > 0):
+        raise ValueError("noise_mw must be finite and > 0")
+    # allocate the cube -> for every combination of tilt numbers, stack one row per sector,
+    # best_server_sinr, SE = log2(1 + SINR) -> store into the cube.
+
+    tilts_counts = [sector_table.shape[0] for sector_table in tables] # Gather the sum of tilts for each sector from tables
+    cube_shape = tuple(tilts_counts) + (n_points,) # Build the final shape tuple by adding n_points at the end
+    cube = np.empty(cube_shape)
+
+    # Loop over every combination of tilts dynamically
+
+    for idx in np.ndindex(*tilts_counts):
+        selected_rows = [tables[s][idx[s]] for s in range(len(tables))] # Creates a list of 1D array of the length of n_points
+        power_matrix = np.stack(selected_rows, axis=0) # Stack thes rows into array of shape (n_sectors, n_points)
+        
+        # Unpack the outputs: discard serving sector (_), keep sinr
+        _, sinr = best_server_sinr(power_matrix, noise_mw)
+
+        # Calculate Spectral Efficiency (SE)
+        se_result = np.log2(1 + sinr)
+
+        # Store the entire 1D array of points into the cube at coordinate idx
+        cube[idx] = se_result
+
+    return cube
+
+
 def exclusion_mask(x, y, sectors, d_min: float = 35.0):
     """Boolean mask of the points where the radio model is valid (decision log D09).
 
