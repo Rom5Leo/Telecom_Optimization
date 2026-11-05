@@ -4,7 +4,7 @@ import numpy as np
 from telecomopt.coverage import (
     sample_wedge, sample_rectangle, to_xy, uniform_demand, hotspot_demand,
     weighted_mean, weighted_percentile, served_fraction,
-    spectral_efficiency_field, coverage_report, non_dominated,
+    spectral_efficiency_field, coverage_report, non_dominated, sweep_metrics,
 )
 import pytest
 
@@ -201,3 +201,63 @@ def test_sample_rectangle_asymmetric_bounds_and_single_cell():
 def test_sample_rectangle_guards(args):
     with pytest.raises(ValueError):
         sample_rectangle(*args)
+
+
+# ---- sweep_metrics (Stage 2b) ---------------------------------------------------------------
+
+def test_sweep_metrics_hand_worked():
+    # two combinations, three points, weights 1:1:2
+    #   row 0 SE [1, 2, 3]: mean (1 + 2 + 6) / 4 = 2.25, 5th pct = 1 (lowest value carries 25 % of weight)
+    #   row 1 SE [4, 4, 10]: mean (4 + 4 + 20) / 4 = 7.0, 5th pct = 4
+    cube = np.array([[1.0, 2.0, 3.0], [4.0, 4.0, 10.0]])
+    out = sweep_metrics(cube, [1.0, 1.0, 2.0])
+    assert set(out) == {"mean_se", "p5_se"}
+    assert np.allclose(out["mean_se"], [2.25, 7.0])
+    assert np.allclose(out["p5_se"], [1.0, 4.0])
+
+
+def test_sweep_metrics_matches_the_1b_functions_entry_by_entry():
+    rng = np.random.default_rng(5)
+    cube = rng.uniform(0.5, 9.0, (3, 4, 60)); w = rng.uniform(0.1, 2.0, 60)
+    out = sweep_metrics(cube, w)
+    assert out["mean_se"].shape == out["p5_se"].shape == (3, 4)
+    for i in range(3):
+        for j in range(4):
+            assert np.isclose(out["mean_se"][i, j], weighted_mean(cube[i, j], w))
+            assert np.isclose(out["p5_se"][i, j], weighted_percentile(cube[i, j], w, 5.0))
+
+
+def test_sweep_metrics_zero_weight_points_are_ignored():
+    rng = np.random.default_rng(6)
+    cube = rng.uniform(0.5, 9.0, (2, 2, 30)); w = rng.uniform(0.1, 2.0, 30)
+    w[[3, 7, 20]] = 0.0                                   # e.g. points inside the D09 floor
+    keep = w > 0
+    full = sweep_metrics(cube, w)
+    trimmed = sweep_metrics(cube[..., keep], w[keep])
+    assert np.allclose(full["mean_se"], trimmed["mean_se"])
+    assert np.allclose(full["p5_se"], trimmed["p5_se"])
+
+
+def test_sweep_metrics_scale_of_weights_does_not_matter():
+    rng = np.random.default_rng(7)
+    cube = rng.uniform(0.5, 9.0, (2, 3, 25)); w = rng.uniform(0.1, 2.0, 25)
+    a, b = sweep_metrics(cube, w), sweep_metrics(cube, 1000.0 * w)
+    assert np.allclose(a["mean_se"], b["mean_se"]) and np.allclose(a["p5_se"], b["p5_se"])
+
+
+def test_sweep_metrics_any_number_of_tilt_axes():
+    cube = np.random.default_rng(8).uniform(1.0, 5.0, (2, 3, 2, 10))
+    out = sweep_metrics(cube, np.ones(10))
+    assert out["mean_se"].shape == (2, 3, 2)
+    assert np.isclose(out["mean_se"][1, 2, 0], cube[1, 2, 0].mean())
+
+
+@pytest.mark.parametrize("cube, w", [
+    (np.ones(5), np.ones(5)),                              # no tilt axis
+    (np.ones((2, 5)), np.ones(4)),                         # wrong number of weights
+    (np.ones((2, 5)), -np.ones(5)),                        # negative weights
+    (np.ones((2, 5)), np.zeros(5)),                        # no demand at all
+])
+def test_sweep_metrics_guards(cube, w):
+    with pytest.raises(ValueError):
+        sweep_metrics(cube, w)

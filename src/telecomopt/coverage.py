@@ -169,6 +169,39 @@ def coverage_report(tilt_e_deg, dist, az_deg, demand, area, threshold=1.0,
             "served_fraction": served_fraction(se, w, threshold)}
 
 
+def sweep_metrics(cube, weights):
+    """Demand-weighted mean SE and 5th-percentile SE for every tilt combination (Stage 2b).
+
+    Parameters
+    ----------
+    cube    : array ``(n_1, ..., n_N, n_points)`` — the spectral efficiency of every tilt combination at
+              every point (:func:`telecomopt.network.se_cube`).
+    weights : array ``(n_points,)`` — aggregation weight of each point, demand x cell area, with
+              ``0`` at points outside the valid region (D09). Finite, non-negative, positive total.
+
+    Returns a dict ``{"mean_se": ..., "p5_se": ...}``; each value is an array of shape
+    ``(n_1, ..., n_N)`` holding the 1b metrics (:func:`weighted_mean`, :func:`weighted_percentile` at 5)
+    of that combination's SE over the points. The metric definitions are unchanged from Stage 1b.
+    """
+    cube = np.asarray(cube, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if cube.ndim < 2:
+        raise ValueError(f"cube must have shape (..., n_points) with at least one tilt axis, got {cube.shape}")
+    if weights.shape != (cube.shape[-1],):
+        raise ValueError(f"weights must have shape ({cube.shape[-1]},), got {weights.shape}")
+    # two empty result arrays shaped like the cube without its last axis -> for every
+    # combination of tilt numbers, the two 1b metrics over the points -> return both in a dict.
+
+    shape = cube.shape[:-1]
+    box_means, box_p5 = np.empty(shape), np.empty(shape)
+
+    for idx in np.ndindex(*shape):
+        box_means[idx] = weighted_mean(cube[idx], weights)
+        box_p5[idx] = weighted_percentile(cube[idx], weights, q = 5.0)
+
+    return {"mean_se": box_means, "p5_se": box_p5}
+
+
 def non_dominated(*objectives):
     """Pareto mask: True for the options that no other option dominates (all objectives MAXIMIZED).
 
