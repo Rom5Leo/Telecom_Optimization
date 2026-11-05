@@ -253,9 +253,12 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   uniform area weights; even `nx`, so no sample lies on the tie line x = 250. Points inside the D09 floor
   of either mast get zero weight. Resolution is checked by refining the grid alone (50², 100², 200²) with
   the tilt step fixed; the strongest claim made is "stable under this refinement".
-- **Tilt range:** electrical tilt 0–10° in 0.5° steps (21 values, 441 pairs), taken from the ≲ 10° limit
-  quoted for [E] in `domain_primer.md` (to be checked against the paper, including the sign convention);
-  mechanical tilt 0. A wider 2–18° sweep is run once and labelled a **model-exploration** range, to show
+- **Tilt range:** electrical tilt 0–10° in 0.5° steps (21 values, 441 pairs); mechanical tilt 0. Source:
+  [E] Sec. I — "Due to grating lobe effects, RET antenna tilt intervals are typically limited to <10°
+  relative to a nominal tilt direction"; [E] Sec. III-A — the measured patterns cover "the available
+  electrical tilt values of {0, 1, ..., 10}°"; [A] lists RET as 0–10° typical, vendor dependent. Sign
+  convention: α_e is the electrical *downtilt*, positive below the horizontal ([E] Sec. II), as in our code.
+  The 10° end is the edge of the stated interval, not a hard physical limit. A wider 2–18° sweep is run once and labelled a **model-exploration** range, to show
   whether an optimum at the 10° edge is constraint-active. Feasibility is stated separately from the
   optimum.
 - **Separable sweep:** the received power of sector j depends only on its own tilt, so one power table per
