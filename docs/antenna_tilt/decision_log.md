@@ -290,16 +290,22 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   sectors on their elevation parabola, dΔ_dB/dt = 24(β₁ − β₂)/HPBW², and the *absolute* gap obeys
   d|Δ_dB|/dt = sgn(Δ_dB)·24(β₁ − β₂)/HPBW² (the earlier "widens at every point" was a sign error). Whole-map check:
   8°→10° widens |Δ| in every cell; 11°→12° in every cell where neither pattern is clipped (41.7 % of the area; elevation floor and SLL0 both
-  checked by `network.on_pattern_parabola`); 4°→5° in only 66.2 % of the unclipped part (rule right on 87.1 %), consistent with the equal-tilt dip near 4.5°. **H2 supported at (10°, 10°)
-  only:** worst 5 % = strip x ∈ [227.5, 272.5] m (~10 % of area), all within 3 dB of equal power. At (5.5°, 18.5°) the
-  worst 5 % is a ring 98–157 m from sector 2 and only 43.7 % lie within 3 dB of equal power — the lower tail there is
-  also the edge of the steep sector's footprint, so H2 does not carry over unchanged.
+  checked by `network.on_pattern_parabola`); 4°→5° in only 66.2 % of the unclipped part (the derivative at 4° points to widening on only 53.3 %:
+  cells cross equal power within the step). Over a finite unclipped step Δ_b = Δ_a + k·h holds exactly (k = 24(β₁ − β₂)/HPBW²),
+  so |Δ_b| > |Δ_a| ⇔ kh(2Δ_a + kh) > 0 (verified on 100 % of unclipped cells); 11°→12° widens the gap everywhere
+  unclipped but raises SE on 99.8 % (noise not negligible everywhere). Consistent with the equal-tilt dip near 4.5°. **H2 supported at (10°, 10°)
+  only:** worst 5 % = strip x ∈ [227.5, 272.5] m (full range, ~10 % of area), all within 3 dB of equal power. At (12°, 12°) mostly a
+  central strip plus small corner patches (~9 % of tail weight). At (5.5°, 18.5°) the worst 5 % lies mainly on an arc
+  around sector 2's footprint (middle 90 %: 98–157 m from its mast) and only 43.7 % lie within 3 dB of equal power — the
+  low-quality region follows the footprint boundary and extends to where the imbalance stays modest; the floor onset
+  (≈150 m) is a supported interpretation, not an isolated mechanism. CDFs of (12°,12°) and (5.5°,18.5°) cross near
+  5.4 bps/Hz: neither is better at every threshold.
 - **Physical picture:** at t₂ = 18.5° the beam lands ≈ 85 m out; by Euclidean distance ≈ 86 % of the weighted area is
   beyond the floor onset (≈ 150 m) and the floor condition holds on ≈ 88 %. Not "little interference": I/N ≥ 15.7 dB
   everywhere, S/I = 5.7 / 15.8 / 22.2 dB at the 5th / 50th / 95th percentile — the gain is a wide power ratio.
 - **Artefact audit (one variable at a time, fixed candidates):** grid 50² / 100² / 200² moves mean SE of every
-  candidate < 2 % (the two best unequal pairs swap on the 5th percentile: a tie on the ridge) → not a numerical
-  artefact. Region y half-width 125 / 250 / 400 / 500 m: the lower-tail advantage **shrinks to almost nothing at 125 m** ((12,12):
+  candidate < 2 % (the two best unequal pairs swap on the 5th percentile: a tie on the ridge) → the substantial lower-tail advantage persists under the
+  tested grid refinements (200²: p5 2.21 at (5.5°, 18.5°) vs 1.34 at (12°, 12°)). Region y half-width 125 / 250 / 400 / 500 m: the lower-tail advantage **shrinks to almost nothing at 125 m** ((12,12):
   p5 1.61 vs 1.62–1.69, while the unequal pairs lose ~26–30 % of mean SE) and grows at 400–500 m (≈ 2.3–2.5 vs ≈ 1.0). Elevation floor SLL_el −17/−20/−25/−30 dB: the
   unequal ridge persists (p5 ≈ 2.2–2.7 vs 1.35–1.44) but the optimum moves to the 20° range edge at ≤ −20 dB and the
   *mean* optimum also becomes unequal ((7°, 18.5°) at −20 dB). → scenario- and model-dependent, not universal.
