@@ -23,7 +23,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from telecomopt.rf import RFParams, DEFAULT_PARAMS, path_gain_2d_db, to_db
+from telecomopt.rf import (RFParams, DEFAULT_PARAMS, path_gain_2d_db, to_db,
+                          elevation_angle_deg, azimuth_gain_db)
 
 
 @dataclass(frozen=True)
@@ -308,3 +309,33 @@ def field_maps(X, Y, sectors, tilts_e_deg, tilts_m_deg=None, d_min: float = 35.0
     power_dbm = np.where(valid, to_db(f["powers"]).reshape((len(sectors),) + shape), np.nan)
     return {"power_dbm": power_dbm, "serving": to_map(f["serving"]),
             "sinr_db": to_map(to_db(f["sinr"])), "se": to_map(f["se"]), "valid": valid}
+
+
+def on_pattern_parabola(x, y, sector: Sector, tilt_e_deg: float, params: RFParams = DEFAULT_PARAMS):
+    """Boolean mask: where this sector's pattern toward a point is on its tilt-dependent parabola.
+
+    With mechanical tilt 0 the relative pattern of [E] Eq. 3-5 toward a point at depression angle
+    ``beta`` and azimuth ``phi`` (sector frame) is
+
+        A = max( G_az(phi) + max(q, SLL_el), SLL0 ),    q = -12 ((beta - t) / HPBW_el)^2 .
+
+    Only ``q`` depends on the tilt ``t``. A point is "on the parabola" when **neither** clip is active:
+
+        q > SLL_el            (the elevation pattern is not on its floor), and
+        G_az(phi) + q > SLL0  (the overall pattern is not on its floor).
+
+    There ``dA/dt = dq/dt = 24 (beta - t) / HPBW_el^2``; where either clip is active the pattern does
+    not respond to small tilt changes. This is condition (ii) of the power-gap derivative in the
+    Stage 2b notebook. Electrical tilt only (mechanical tilt 0 is assumed and not a parameter).
+
+    Returns a boolean array with the shape of ``x``.
+    """
+    if not np.isfinite(tilt_e_deg):
+        raise ValueError("tilt_e_deg must be finite")
+
+    dist, az = to_sector_frame(x, y, sector)
+    beta = np.array([elevation_angle_deg(d, params) for d in dist.ravel()]).reshape(dist.shape)
+    g_az = np.array([azimuth_gain_db(a, params) for a in az.ravel()]).reshape(az.shape)
+    q = -12.0 * ((beta - tilt_e_deg) / params.hpbw_el) ** 2
+    
+    return (q > params.sll_el) & (g_az + q > params.sll0)

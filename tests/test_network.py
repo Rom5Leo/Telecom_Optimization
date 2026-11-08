@@ -7,11 +7,11 @@ crossing of the facing-sites layout (decision log D11).
 import numpy as np
 import pytest
 
-from telecomopt.rf import DEFAULT_PARAMS, RFParams, path_gain_2d_db
+from telecomopt.rf import DEFAULT_PARAMS, RFParams, path_gain_2d_db, pattern_gain_db, azimuth_gain_db, elevation_angle_deg
 from telecomopt.coverage import sweep_metrics, sample_wedge, sample_rectangle, to_xy, spectral_efficiency_field
 from telecomopt.network import (
     Sector, to_sector_frame, received_power_mw, best_server_sinr, sinr_field,
-    exclusion_mask, field_maps, power_table, se_cube,
+    exclusion_mask, field_maps, power_table, se_cube, on_pattern_parabola,
 )
 
 P = DEFAULT_PARAMS
@@ -362,3 +362,68 @@ def test_joint_objectives_are_symmetric_in_the_two_tilts():
     for key in ("mean_se", "p5_se"):
         assert np.allclose(out[key], out[key].T, rtol=1e-9, atol=1e-12)
     assert not np.allclose(out["mean_se"], out["mean_se"][0, 0])    # the landscape is not flat
+
+
+# --- on_pattern_parabola -----------------------------------------------------------------------
+
+H_EFF = P.bs_height - P.ue_height          # 28.5 m: tan(depression) = H_EFF / d
+
+
+def _boresight_point_at(depression_deg):
+    """Point on sector 1's boresight (y = 0) seen at the given depression angle."""
+    return np.array([H_EFF / np.tan(np.radians(depression_deg))]), np.array([0.0])
+
+
+def test_parabola_true_where_the_beam_points():
+    x, y = _boresight_point_at(8.0)                            # beta = t: q = 0
+    assert on_pattern_parabola(x, y, S1, 8.0).tolist() == [True]
+
+
+def test_parabola_switches_at_the_elevation_floor_on_boresight():
+    # floor onset |beta - t| = HPBW * sqrt(17 / 12) = 7.737 deg; on boresight G_az = 0, so SLL0 cannot clip
+    x_in, y_in = _boresight_point_at(7.7)      # q = -16.84 > -17
+    x_out, y_out = _boresight_point_at(7.8)    # q = -17.28 < -17
+    assert on_pattern_parabola(x_in, y_in, S1, 0.0).tolist() == [True]
+    assert on_pattern_parabola(x_out, y_out, S1, 0.0).tolist() == [False]
+
+
+def test_parabola_false_where_the_overall_floor_clips_off_boresight():
+    # azimuth 90 deg: G_az = -12 (90/65)^2 = -23.0 dB. beta - t = 4: q = -4.5, sum -27.5 > -30 -> True;
+    # beta - t = 6: q = -10.2 (above the -17 floor) but sum -33.2 < -30 -> False (SLL0 clips).
+    for depression, expected in [(4.0, True), (6.0, False)]:
+        d = H_EFF / np.tan(np.radians(depression))
+        assert on_pattern_parabola(np.array([0.0]), np.array([d]), S1, 0.0).tolist() == [expected]
+
+
+def test_parabola_agrees_with_the_full_pattern():
+    # ground truth: [E] Eq. 5 as coded in pattern_gain_db; on the parabola it equals G_az + q exactly
+    rng = np.random.default_rng(7)
+    x = rng.uniform(-400.0, 400.0, 300); y = rng.uniform(-400.0, 400.0, 300)
+    keep = np.hypot(x, y) > 35.0
+    x, y = x[keep], y[keep]
+    for tilt in (0.0, 6.0, 15.0):
+        mask = on_pattern_parabola(x, y, S1, tilt)
+        dist, az = to_sector_frame(x, y, S1)
+        for k in range(len(x)):
+            beta = elevation_angle_deg(dist[k])
+            q = -12.0 * ((beta - tilt) / P.hpbw_el) ** 2
+            unclipped = np.isclose(pattern_gain_db(beta, az[k], tilt, 0.0), azimuth_gain_db(az[k]) + q, atol=1e-9)
+            assert mask[k] == unclipped
+
+
+def test_parabola_mirror_sector_and_shape():
+    X, Y = np.meshgrid(np.linspace(40.0, 460.0, 7), np.linspace(-200.0, 200.0, 5), indexing="ij")
+    m2 = on_pattern_parabola(X, Y, S2, 9.0)
+    assert m2.shape == X.shape and m2.dtype == bool
+    np.testing.assert_array_equal(m2, on_pattern_parabola(500.0 - X, Y, S1, 9.0))
+
+
+def test_parabola_follows_the_floor_parameter():
+    x, y = _boresight_point_at(7.8)
+    deep = RFParams(sll_el=-30.0)                              # onset now 6.5 * sqrt(30/12) = 10.3 deg
+    assert on_pattern_parabola(x, y, S1, 0.0, params=deep).tolist() == [True]
+
+
+def test_parabola_rejects_a_non_finite_tilt():
+    with pytest.raises(ValueError):
+        on_pattern_parabola(np.array([100.0]), np.array([0.0]), S1, float("nan"))

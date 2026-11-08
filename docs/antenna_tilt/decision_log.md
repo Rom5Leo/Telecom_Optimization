@@ -256,9 +256,9 @@ Two reusable concepts are named where they first appear: the **demand field** (1
 - **Tilt range:** electrical tilt 0–10° in 0.5° steps (21 values, 441 pairs); mechanical tilt 0. Source:
   [E] Sec. I — "Due to grating lobe effects, RET antenna tilt intervals are typically limited to <10°
   relative to a nominal tilt direction"; [E] Sec. III-A — the measured patterns cover "the available
-  electrical tilt values of {0, 1, ..., 10}°"; [A] lists RET as 0–10° typical, vendor dependent. Sign
+  electrical tilt values of {0, 1, ..., 10}°" (the set used to *validate the pattern model*, not an optimisation interval: [E] Sec. III-B computes coverage over α_e ∈ [−5, 15]° and α_m ∈ [−5, 20]° with identical settings at every site; correction to the first reading of D12); [A] lists RET as 0–10° typical, vendor dependent. Sign
   convention: α_e is the electrical *downtilt*, positive below the horizontal ([E] Sec. II), as in our code.
-  The 10° end is the edge of the stated interval, not a hard physical limit. A wider 2–18° sweep is run once and labelled a **model-exploration** range, to show
+  The 10° end is the edge of the stated interval, not a hard physical limit; the interval is vendor-dependent and an assumed baseline here. A wider 0–20° sweep is run once and labelled a **model-exploration** range, to show
   whether an optimum at the 10° edge is constraint-active. Feasibility is stated separately from the
   optimum.
 - **Separable sweep:** the received power of sector j depends only on its own tilt, so one power table per
@@ -278,6 +278,40 @@ Two reusable concepts are named where they first appear: the **demand field** (1
   is more sensitive to the geometry of that boundary than the mean is.
 - **Demand cases:** uniform first; then hotspots (OQ11). Uncertainty (D06) remains a separate pending layer;
   all 2b results are deterministic, median-link.
+
+## D13 — Stage 2b results: what the uniform-demand sweep established, and its limits
+- **Inside the assumed 0–10° interval** both objectives and the γ = 2 served fraction peak at (10°, 10°), the edge
+  (constraint-active, not a plateau, no trade-off). J(t₁, t₂) = J(t₂, t₁) holds to ~1e-15.
+- **Extended electrical-tilt exploration 0–20°, mechanical tilt 0** (extends D12's plan; model exploration, not a recommendation; total forward tilt = α_m + α_e, so the axes are also total boresight tilts, but relabelling these results as electrical-plus-mechanical would be wrong off boresight — a mechanical-tilt study is a separate controlled comparison, OQ3): the mean-SE
+  optimum is (12°, 12°); the best *sampled* 5th-percentile pair is (5.5°, 18.5°), one point on a flat unequal
+  ridge (local 0.25° refinement gives (5°, 19°), 2.222; best t₂ per t₁ slides from 18.75° to 17.25° as t₁ goes
+  4° → 8°). Gain over the best equal pair: 5th-pct SE 2.23 vs 1.35 (+65 %) for −3 % mean SE.
+- **Mechanism (H1, supported with conditions):** SINR_dB ≈ |Δ_dB| when interference-limited; for equal tilts with both
+  sectors on their elevation parabola, dΔ_dB/dt = 24(β₁ − β₂)/HPBW², and the *absolute* gap obeys
+  d|Δ_dB|/dt = sgn(Δ_dB)·24(β₁ − β₂)/HPBW² (the earlier "widens at every point" was a sign error). Whole-map check:
+  8°→10° widens |Δ| in every cell; 11°→12° in every cell where neither pattern is clipped (41.7 % of the area; elevation floor and SLL0 both
+  checked by `network.on_pattern_parabola`); 4°→5° in only 66.2 % of the unclipped part (rule right on 87.1 %), consistent with the equal-tilt dip near 4.5°. **H2 supported at (10°, 10°)
+  only:** worst 5 % = strip x ∈ [227.5, 272.5] m (~10 % of area), all within 3 dB of equal power. At (5.5°, 18.5°) the
+  worst 5 % is a ring 98–157 m from sector 2 and only 43.7 % lie within 3 dB of equal power — the lower tail there is
+  also the edge of the steep sector's footprint, so H2 does not carry over unchanged.
+- **Physical picture:** at t₂ = 18.5° the beam lands ≈ 85 m out; by Euclidean distance ≈ 86 % of the weighted area is
+  beyond the floor onset (≈ 150 m) and the floor condition holds on ≈ 88 %. Not "little interference": I/N ≥ 15.7 dB
+  everywhere, S/I = 5.7 / 15.8 / 22.2 dB at the 5th / 50th / 95th percentile — the gain is a wide power ratio.
+- **Artefact audit (one variable at a time, fixed candidates):** grid 50² / 100² / 200² moves mean SE of every
+  candidate < 2 % (the two best unequal pairs swap on the 5th percentile: a tie on the ridge) → not a numerical
+  artefact. Region y half-width 125 / 250 / 400 / 500 m: the lower-tail advantage **shrinks to almost nothing at 125 m** ((12,12):
+  p5 1.61 vs 1.62–1.69, while the unequal pairs lose ~26–30 % of mean SE) and grows at 400–500 m (≈ 2.3–2.5 vs ≈ 1.0). Elevation floor SLL_el −17/−20/−25/−30 dB: the
+  unequal ridge persists (p5 ≈ 2.2–2.7 vs 1.35–1.44) but the optimum moves to the 20° range edge at ≤ −20 dB and the
+  *mean* optimum also becomes unequal ((7°, 18.5°) at −20 dB). → scenario- and model-dependent, not universal.
+- **Load / resource sharing:** sector 1 serves 89.7 % of the area at the unequal optimum. Mean SE is a per-link
+  figure C_u, not network capacity or user throughput (R_u ≈ B·f_u·C_u needs the resource fraction f_u, not modelled).
+  Whether the advantage survives resource sharing remains untested; scheduling belongs to a later analysis.
+- **Claim we make:** under the deterministic two-sector model and the baseline uniform-demand region, unequal tilts
+  substantially improve lower-tail link SE with a modest mean-SE penalty; magnitude and preferred pair depend on
+  the region and floor. **Not claimed:** robustness to the floor *approximation* (only the level was varied), realisability by hardware, behaviour under concentrated demand or load
+  balance, results with shadowing (D06).
+- **Next:** deliberate hotspot cases (near sector 1, middle, near sector 2) before the OQ11 random ensemble;
+  ridge-aware reporting (report the ridge, not one pair); load-aware objective as an open question.
 
 ---
 
