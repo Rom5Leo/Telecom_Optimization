@@ -142,6 +142,33 @@ def weighted_percentile(values, weights, q):
     
 
 
+def weighted_cdf(values, weights):
+    """Weighted empirical CDF: the values sorted ascending and, for each, the share of the total
+    weight at or below it.
+
+        F(v_k) = sum_{i <= k} w_(i) / sum_i w_i ,   v_(1) <= v_(2) <= ...
+
+    Returns ``(sorted_values, cumulative_share)``, two 1-D arrays of the same length; the last share is
+    1. It is the curve behind :func:`weighted_percentile`: the q-th percentile is the first sorted value
+    whose share reaches q/100. Same contract as the other weighted metrics (matching shapes, finite
+    non-negative weights, positive total).
+    """
+    values, weights, total = _as_weighted(values, weights)
+    # the order that sorts the values; the values in that order; the weights in that same
+    # order, accumulated and divided by the total.
+    # e.g. values [3, 1, 2], weights [1, 1, 2] -> sorted values [1, 2, 3], shares [0.25, 0.75, 1.0].
+
+    values, weights = values.ravel(), weights.ravel()
+
+    order = np.argsort(values)
+    sorted_values = values[order]
+    ordered_weights = weights[order]
+
+    running_total = np.cumsum(ordered_weights)
+    cumulative_share = running_total / total
+
+    return sorted_values, cumulative_share
+
 def served_fraction(values, weights, threshold):
     """Weighted fraction of points with value >= threshold."""
     values, weights, total = _as_weighted(values, weights)

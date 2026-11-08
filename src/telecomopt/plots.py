@@ -27,3 +27,42 @@ def tilt_heatmap(ax, tilts_1, tilts_2, values, title: str = "", mark_argmax: boo
     ax.set_title(title)
     ax.set_aspect("equal")
     return mesh
+
+
+def grid_image(values, nx: int, ny: int, valid=None):
+    """Flat per-cell values of a :func:`telecomopt.coverage.sample_rectangle` grid -> an image array.
+
+    ``sample_rectangle`` orders the cells x-major (index = i * ny + j for x-column i and y-row j). An
+    image has rows = y and columns = x, so the result has shape ``(ny, nx)`` with ``image[j, i]`` the
+    value of cell (i, j); draw it with ``imshow(..., origin="lower")``. Cells where ``valid`` is False
+    (e.g. the D09 tower floors) become NaN, so they are not drawn. Returns a float array.
+    """
+    values = np.asarray(values, dtype=float)
+    if values.size != nx * ny:
+        raise ValueError(f"need nx * ny = {nx * ny} values, got {values.size}")
+    if valid is not None and np.asarray(valid).shape != values.shape:
+        raise ValueError("valid must have the shape of values")
+    # if a mask is given, put NaN where it is False; reshape to (nx, ny) (axis 0 = x, as
+    # sample_rectangle made it); transpose so rows are y.
+    # e.g. nx = 3, ny = 2, values [0, 1, 2, 3, 4, 5] -> [[0, 2, 4], [1, 3, 5]].
+
+    if valid is not None:
+        values = np.where(np.array(valid), np.array(values), np.nan)
+
+    image_reshape = values.reshape(nx, ny).T
+
+    return image_reshape
+
+
+def field_map(ax, values, nx: int, ny: int, extent, valid=None, masts=(), **imshow_kw):
+    """Draw one per-cell field of a ``sample_rectangle`` grid on ``ax`` as an image.
+
+    ``extent = (x_min, x_max, y_min, y_max)`` of the region; ``masts`` is a sequence of (x, y) mast
+    positions drawn as black triangles; further keyword arguments go to ``imshow`` (``cmap``, ``vmin``,
+    ``vmax``, ...). Returns the image, for a colour bar.
+    """
+    image = ax.imshow(grid_image(values, nx, ny, valid), origin="lower", extent=list(extent),
+                      aspect="equal", **imshow_kw)
+    for mx, my in masts:
+        ax.plot(mx, my, marker="^", color="k", mec="white", ms=7, ls="none")
+    return image

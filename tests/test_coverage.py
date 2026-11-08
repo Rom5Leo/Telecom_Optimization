@@ -4,7 +4,7 @@ import numpy as np
 from telecomopt.coverage import (
     sample_wedge, sample_rectangle, to_xy, uniform_demand, hotspot_demand,
     weighted_mean, weighted_percentile, served_fraction,
-    spectral_efficiency_field, coverage_report, non_dominated, sweep_metrics,
+    spectral_efficiency_field, coverage_report, non_dominated, sweep_metrics, weighted_cdf,
 )
 import pytest
 
@@ -261,3 +261,42 @@ def test_sweep_metrics_any_number_of_tilt_axes():
 def test_sweep_metrics_guards(cube, w):
     with pytest.raises(ValueError):
         sweep_metrics(cube, w)
+
+
+# --- weighted_cdf -------------------------------------------------------------------------------
+
+def test_weighted_cdf_hand_example():
+    v, share = weighted_cdf(np.array([3.0, 1.0, 2.0]), np.array([1.0, 1.0, 2.0]))
+    np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(share, [0.25, 0.75, 1.0])
+
+
+def test_weighted_cdf_uniform_weights_is_the_plain_ecdf():
+    v, share = weighted_cdf(np.array([5.0, 4.0, 3.0, 2.0, 1.0]), np.ones(5))
+    np.testing.assert_allclose(v, [1.0, 2.0, 3.0, 4.0, 5.0])
+    np.testing.assert_allclose(share, [0.2, 0.4, 0.6, 0.8, 1.0])
+
+
+def test_weighted_cdf_is_monotone_and_ends_at_one():
+    rng = np.random.default_rng(3)
+    vals = rng.normal(size=500); w = rng.uniform(0.0, 2.0, 500)
+    v, share = weighted_cdf(vals, w)
+    assert v.shape == share.shape == (500,)
+    assert np.all(np.diff(v) >= 0) and np.all(np.diff(share) >= -1e-15)
+    assert np.isclose(share[-1], 1.0)
+
+
+def test_weighted_cdf_matches_weighted_percentile():
+    # the percentile is the first sorted value whose share reaches q / 100 (powers-of-two weights: exact sums)
+    vals = np.array([4.0, 0.5, 2.5, 1.0, 3.0, 2.0, 5.0, 0.0])
+    w = np.array([0.125, 0.25, 0.0625, 0.125, 0.125, 0.25, 0.03125, 0.03125])
+    v, share = weighted_cdf(vals, w)
+    for q in (5.0, 25.0, 50.0, 90.0):
+        assert v[np.searchsorted(share, q / 100.0)] == weighted_percentile(vals, w, q)
+
+
+def test_weighted_cdf_guards():
+    with pytest.raises(ValueError):
+        weighted_cdf(np.ones(3), np.ones(4))
+    with pytest.raises(ValueError):
+        weighted_cdf(np.ones(3), np.array([1.0, -1.0, 1.0]))
